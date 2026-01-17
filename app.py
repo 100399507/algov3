@@ -21,9 +21,6 @@ if "buyers" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "buyer_max_price" not in st.session_state:
-    st.session_state.buyer_max_price = {}
-
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -53,40 +50,9 @@ with st.sidebar.form("add_buyer_form"):
     buyer_products = {}
     for p in products:
         st.markdown(f"**{p['name']} ({p['id']})**")
-        qty = st.number_input(
-            f"Qté désirée – {p['id']}", 
-            min_value=p["seller_moq"], 
-            value=p["seller_moq"], 
-            step=5, 
-            key=f"qty_{p['id']}_{buyer_name}"
-        )
-        price = st.number_input(
-            f"Prix courant – {p['id']}", 
-            min_value=0.0, 
-            value=p["starting_price"], 
-            key=f"price_{p['id']}_{buyer_name}"
-        )
-
-        # Initialisation safe pour max_price
-        if buyer_name:
-            if buyer_name not in st.session_state.buyer_max_price:
-                st.session_state.buyer_max_price[buyer_name] = {}
-            if p['id'] not in st.session_state.buyer_max_price[buyer_name]:
-                st.session_state.buyer_max_price[buyer_name][p['id']] = price + 2
-
-            max_price_input = st.number_input(
-                f"Prix max – {p['id']}", 
-                min_value=price,
-                value=st.session_state.buyer_max_price[buyer_name][p['id']],
-                key=f"max_{p['id']}_{buyer_name}"
-            )
-
-            # Sauvegarder pour persistance
-            st.session_state.buyer_max_price[buyer_name][p['id']] = max_price_input
-        else:
-            max_price_input = price + 2
-
-        # Mettre à jour buyer_products pour que max_price soit bien affiché
+        qty = st.number_input(f"Qté désirée – {p['id']}", min_value=p["seller_moq"], value=p["seller_moq"], step=5)
+        price = st.number_input(f"Prix courant – {p['id']}", min_value=0.0, value=p["starting_price"])
+        max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=price+2)
         buyer_products[p["id"]] = {
             "qty_desired": qty,
             "current_price": price,
@@ -124,7 +90,7 @@ if st.session_state.buyers:
                 f"Prix max – {pid} ({buyer['name']})",
                 min_value=prod["current_price"],
                 value=prod["max_price"],
-                key=f"edit_max_{buyer['name']}_{pid}"
+                key=f"max_{buyer['name']}_{pid}"
             )
             # Met à jour la valeur dans session_state
             st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
