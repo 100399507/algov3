@@ -71,6 +71,26 @@ with st.sidebar.form("add_buyer_form"):
         st.success(f"Acheteur {buyer_name} ajouté !")
 
 # -----------------------------
+# Modifier le prix max des acheteurs existants
+# -----------------------------
+st.subheader("✏️ Modifier les prix max des acheteurs")
+if st.session_state.buyers:
+    for idx, buyer in enumerate(st.session_state.buyers):
+        st.markdown(f"**{buyer['name']}**")
+        for pid, prod in buyer["products"].items():
+            new_max = st.number_input(
+                f"Prix max – {pid} ({buyer['name']})",
+                min_value=prod["current_price"],
+                value=prod["max_price"],
+                key=f"max_{buyer['name']}_{pid}"
+            )
+            # Met à jour la valeur dans session_state
+            st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
+            # Si le current_price > nouveau max, on le corrige
+            if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
+                st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
+
+# -----------------------------
 # Affichage acheteurs
 # -----------------------------
 st.subheader("👥 Acheteurs")
@@ -127,7 +147,6 @@ if st.session_state.history:
         st.dataframe(pd.DataFrame(alloc_rows))
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
 
-
 # -----------------------------
 # Recommandations pour nouvel acheteur
 # -----------------------------
@@ -153,5 +172,4 @@ if st.button("📊 Calculer recommandations"):
                 "Status": status_msg
             })
         
-     
-
+        st.dataframe(pd.DataFrame(rec_rows))
