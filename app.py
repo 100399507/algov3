@@ -69,6 +69,42 @@ with st.sidebar.form("add_buyer_form"):
         })
         st.success(f"Acheteur {buyer_name} ajouté !")
 
+
+# -----------------------------
+# Simulation "what-if" sans impact
+# -----------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧪 Simulation sans engagement")
+
+with st.sidebar.form("simulation_form"):
+    sim_price = st.number_input("Prix simulé (€)", min_value=0.0, value=10.0)
+    sim_qty = st.number_input("Quantité souhaitée", min_value=0, value=100, step=10)
+    sim_submit = st.form_submit_button("▶️ Simuler allocation")
+
+if sim_submit:
+    buyers_sim = copy.deepcopy(st.session_state.buyers)
+
+    simulated_buyer = {
+        "name": "__SIMULATION__",
+        "auto_bid": False,
+        "products": {}
+    }
+
+    for p in products:
+        simulated_buyer["products"][p["id"]] = {
+            "qty_desired": sim_qty,
+            "current_price": sim_price,
+            "max_price": sim_price,
+            "moq": p["seller_moq"]
+        }
+
+    buyers_sim.append(simulated_buyer)
+
+    allocations, _ = solve_model(buyers_sim, products)
+
+    st.session_state.simulation_result = allocations.get("__SIMULATION__", {})
+
+
 # -----------------------------
 # Affichage acheteurs
 # -----------------------------
@@ -175,3 +211,21 @@ if st.button("📊 Calculer recommandations"):
             })
         
         st.dataframe(pd.DataFrame(rec_rows))
+
+
+# -----------------------------
+# Résultat simulation
+# -----------------------------
+if "simulation_result" in st.session_state:
+    st.subheader("🧪 Résultat de la simulation (sans engagement)")
+
+    rows = []
+    for pid, qty in st.session_state.simulation_result.items():
+        rows.append({
+            "Produit": pid,
+            "Quantité demandée": sim_qty,
+            "Quantité allouée": qty,
+            "Statut": "✅ Alloué" if qty > 0 else "❌ Non alloué"
+        })
+
+    st.dataframe(pd.DataFrame(rows), use_container_width=True)
