@@ -91,6 +91,24 @@ if st.session_state.buyers:
                 st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
 
 # -----------------------------
+# Affichage des produits
+# -----------------------------
+st.subheader("📦 Produits disponibles")
+prod_rows = []
+for p in products:
+    prod_rows.append({
+        "ID Produit": p["id"],
+        "Nom": p["name"],
+        "Stock disponible": p["stock"],
+        "Volume multiple": p["volume_multiple"],
+        "Prix de départ": p["starting_price"],
+        "MOQ vendeur": p["seller_moq"]
+    })
+st.dataframe(pd.DataFrame(prod_rows))
+
+
+
+# -----------------------------
 # Affichage acheteurs
 # -----------------------------
 st.subheader("👥 Acheteurs")
