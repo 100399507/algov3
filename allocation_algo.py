@@ -133,7 +133,7 @@ def run_auto_bid_aggressive(
 
                 best_price = current_price
 
-                for inc in [0.05, 0.1, 0.2, 0.5, 1.0, 2.0]:
+                for inc in [0.5, 1.0 , 2.0 , 3.0 , 5.0 , 10.0]:
                     test_price = min(current_price + inc, max_price)
                     if test_price <= current_price:
                         continue
