@@ -81,7 +81,7 @@ with st.sidebar.form("add_buyer_form"):
             f"Prix courant – {p['id']}",
             min_value=current_price_min,
             value=current_price_min,
-            step=0,5,
+            step=0.5,
         )
 
 
