@@ -48,46 +48,7 @@ with st.sidebar.form("add_buyer_form"):
     buyer_name = st.text_input("Nom acheteur")
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
-buyer_products = {}
-for p in products:
-    st.markdown(f"**{p['name']} ({p['id']})**")
-    
-    qty = st.number_input(
-        f"Qté désirée – {p['id']}", 
-        min_value=p["seller_moq"], 
-        value=p["seller_moq"], 
-        step=5,
-        key=f"qty_{p['id']}_{buyer_name}"
-    )
-    
-    price = st.number_input(
-        f"Prix courant – {p['id']}", 
-        min_value=0.0, 
-        value=p["starting_price"],
-        key=f"price_{p['id']}_{buyer_name}"
-    )
-    
-    # Prix max : prend la valeur saisie par l'utilisateur ou le current price si aucune valeur
-    max_price_input = st.number_input(
-        f"Prix max – {p['id']}", 
-        min_value=price, 
-        value=st.session_state.get('buyer_max_price', {}).get(buyer_name, {}).get(p['id'], price),
-        key=f"max_{p['id']}_{buyer_name}"
-    )
-    
-    # Sauvegarde dans session_state pour persistance si nécessaire
-    if 'buyer_max_price' not in st.session_state:
-        st.session_state['buyer_max_price'] = {}
-    if buyer_name not in st.session_state['buyer_max_price']:
-        st.session_state['buyer_max_price'][buyer_name] = {}
-    st.session_state['buyer_max_price'][buyer_name][p['id']] = max_price_input
-
-    buyer_products[p["id"]] = {
-        "qty_desired": qty,
-        "current_price": price,
-        "max_price": max_price_input,
-        "moq": p["seller_moq"]
-    }
+buyer_products = {} for p in products: st.markdown(f"**{p['name']} ({p['id']})**") qty = st.number_input(f"Qté désirée – {p['id']}", min_value=p["seller_moq"], value=p["seller_moq"], step=5) price = st.number_input(f"Prix courant – {p['id']}", min_value=0.0, value=p["starting_price"]) max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=price) buyer_products[p["id"]] = { "qty_desired": qty, "current_price": price, "max_price": max_price_input, "moq": p["seller_moq"] }
 
     submitted = st.form_submit_button("Ajouter acheteur")
     if submitted and buyer_name:
