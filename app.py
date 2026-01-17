@@ -114,6 +114,25 @@ if simulate_submit:
     st.session_state.simulation_result = allocations.get("__SIMULATION__", {})
 
 
+# -----------------------------
+# Produits en vente
+# -----------------------------
+st.subheader("📦 Produits en vente")
+
+product_rows = []
+for p in products:
+    product_rows.append({
+        "Produit": f"{p['name']} ({p['id']})",
+        "Stock total": p["stock"],
+        "Multiple de volume": p["volume_multiple"],
+        "Prix de départ (€)": p["starting_price"],
+        "MOQ vendeur": p["seller_moq"]
+    })
+
+st.dataframe(
+    pd.DataFrame(product_rows),
+    use_container_width=True
+)
 
 # -----------------------------
 # Affichage acheteurs
