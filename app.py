@@ -67,18 +67,23 @@ with st.sidebar.form("add_buyer_form"):
         # Déterminer le current_price minimal possible pour ce produit
         current_price_min = p["starting_price"]  # valeur par défaut
         if st.session_state.buyers:
-            # On cherche le max du current_price pour ce produit parmi tous les acheteurs
-            current_price_min = max(
-                b["products"][p["id"]]["current_price"] for b in st.session_state.buyers if p["id"] in b["products"]
-            )
+            # On ne prend que les acheteurs ayant une allocation > 0 pour ce produit
+            allocated_prices = [
+                b["products"][p["id"]]["current_price"]
+                for b in st.session_state.buyers
+                if p["id"] in b["products"] and b.get("allocated", {}).get(p["id"], 0) > 0
+            ]
+            if allocated_prices:
+                current_price_min = min(allocated_prices)
         
         # Champ input avec min_value=current_price_min
         price = st.number_input(
             f"Prix courant – {p['id']}",
             min_value=current_price_min,
             value=current_price_min,
-            step=0.1
+            step=0,5
         )
+
 
 
         max_price = st.number_input(
