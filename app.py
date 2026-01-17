@@ -90,6 +90,7 @@ with st.sidebar.form("add_buyer_form"):
             f"Prix max – {p['id']}",
             min_value=price,
             value=price,
+            step=0.5,
             key=f"max_{p['id']}"
         )
 
