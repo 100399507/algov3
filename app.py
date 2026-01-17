@@ -51,7 +51,7 @@ with st.sidebar.form("add_buyer_form"):
         st.markdown(f"**{p['name']} ({p['id']})**")
         qty = st.number_input(f"Qté désirée – {p['id']}", min_value=p["seller_moq"], value=p["seller_moq"], step=5)
         price = st.number_input(f"Prix courant – {p['id']}", min_value=0.0, value=p["starting_price"])
-        max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=p["max_price"])
+        max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=price+2)
         buyer_products[p["id"]] = {
             "qty_desired": qty,
             "current_price": price,
