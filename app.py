@@ -1,0 +1,123 @@
+import streamlit as st
+import pandas as pd
+import copy
+from allocation_algo import solve_model, run_auto_bid_aggressive
+
+# -----------------------------
+# Produits exemples
+# -----------------------------
+products = [
+    {"id": "P1", "name": "Produit 1", "stock": 500, "volume_multiple": 10, "starting_price": 5.0, "seller_moq": 50},
+    {"id": "P2", "name": "Produit 2", "stock": 300, "volume_multiple": 20, "starting_price": 10.0, "seller_moq": 80},
+]
+
+# -----------------------------
+# Session state
+# -----------------------------
+if "buyers" not in st.session_state:
+    st.session_state.buyers = []
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# -----------------------------
+# Helpers
+# -----------------------------
+def buyers_to_df(buyers):
+    rows = []
+    for b in buyers:
+        for pid, p in b["products"].items():
+            rows.append({
+                "Acheteur": b["name"],
+                "Produit": pid,
+                "Qté désirée": p["qty_desired"],
+                "MOQ produit": p["moq"],
+                "Prix courant": p["current_price"],
+                "Prix max": p["max_price"],
+                "Auto-bid": b.get("auto_bid", False)
+            })
+    return pd.DataFrame(rows)
+
+# -----------------------------
+# Ajouter un acheteur
+# -----------------------------
+st.sidebar.title("➕ Ajouter un acheteur")
+with st.sidebar.form("add_buyer_form"):
+    buyer_name = st.text_input("Nom acheteur")
+    auto_bid = st.checkbox("Auto-bid activé", value=True)
+
+    buyer_products = {}
+    for p in products:
+        st.markdown(f"**{p['name']} ({p['id']})**")
+        qty = st.number_input(f"Qté désirée – {p['id']}", min_value=p["seller_moq"], value=p["seller_moq"], step=5)
+        price = st.number_input(f"Prix courant – {p['id']}", min_value=0.0, value=p["starting_price"])
+        max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=price+2)
+        buyer_products[p["id"]] = {
+            "qty_desired": qty,
+            "current_price": price,
+            "max_price": max_price_input,
+            "moq": p["seller_moq"]
+        }
+
+    submitted = st.form_submit_button("Ajouter acheteur")
+    if submitted and buyer_name:
+        st.session_state.buyers.append({
+            "name": buyer_name,
+            "products": buyer_products,
+            "auto_bid": auto_bid
+        })
+        st.success(f"Acheteur {buyer_name} ajouté !")
+
+# -----------------------------
+# Affichage acheteurs
+# -----------------------------
+st.subheader("👥 Acheteurs")
+if st.session_state.buyers:
+    st.dataframe(buyers_to_df(st.session_state.buyers))
+else:
+    st.info("Aucun acheteur pour le moment.")
+
+# -----------------------------
+# Lancer simulation
+# -----------------------------
+st.subheader("⚙️ Simulation auto-bid")
+if st.button("▶️ Lancer simulation avec auto-bid"):
+    buyers_copy = copy.deepcopy(st.session_state.buyers)
+    history = []
+
+    max_rounds = 30
+    for iteration in range(max_rounds):
+        allocations, total_ca = solve_model(buyers_copy, products)
+        history.append({
+            "itération": iteration+1,
+            "allocations": copy.deepcopy(allocations),
+            "total_ca": total_ca,
+            "prices": {b["name"]: {pid: b["products"][pid]["current_price"] for pid in b["products"]} for b in buyers_copy}
+        })
+        buyers_copy_new = run_auto_bid_aggressive(buyers_copy, products, max_rounds=1)
+        if buyers_copy_new == buyers_copy:
+            break
+        buyers_copy = buyers_copy_new
+
+    st.session_state.history = history
+
+# -----------------------------
+# Affichage itérations
+# -----------------------------
+if st.session_state.history:
+    st.subheader("🕒 Itérations simulation")
+    for h in st.session_state.history:
+        st.markdown(f"### Itération {h['itération']}")
+        alloc_rows = []
+        for buyer_name, prods in h["allocations"].items():
+            for pid, qty in prods.items():
+                price = h["prices"][buyer_name][pid]
+                alloc_rows.append({
+                    "Acheteur": buyer_name,
+                    "Produit": pid,
+                    "Prix courant": price,
+                    "Quantité allouée": qty,
+                    "CA ligne": qty * price
+                })
+        st.dataframe(pd.DataFrame(alloc_rows))
+        st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
