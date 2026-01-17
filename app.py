@@ -4,7 +4,6 @@ import copy
 from allocation_algo import solve_model, run_auto_bid_aggressive
 from allocation_recommendation import calculate_optimal_bid
 
-
 # -----------------------------
 # Produits exemples
 # -----------------------------
@@ -51,10 +50,6 @@ with st.sidebar.form("add_buyer_form"):
     buyer_name = st.text_input("Nom acheteur")
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
-    # Initialiser st.session_state pour le max_price du buyer
-    if buyer_name and buyer_name not in st.session_state.buyer_max_price:
-        st.session_state.buyer_max_price[buyer_name] = {p['id']: p["starting_price"] for p in products}
-
     buyer_products = {}
     for p in products:
         st.markdown(f"**{p['name']} ({p['id']})**")
@@ -72,15 +67,24 @@ with st.sidebar.form("add_buyer_form"):
             key=f"price_{p['id']}_{buyer_name}"
         )
 
-        max_price_input = st.number_input(
-            f"Prix max – {p['id']}", 
-            min_value=price,
-            value=st.session_state.buyer_max_price[buyer_name][p['id']],
-            key=f"max_{p['id']}_{buyer_name}"
-        )
+        # Initialisation safe pour max_price
+        if buyer_name:
+            if buyer_name not in st.session_state.buyer_max_price:
+                st.session_state.buyer_max_price[buyer_name] = {}
+            if p['id'] not in st.session_state.buyer_max_price[buyer_name]:
+                st.session_state.buyer_max_price[buyer_name][p['id']] = price + 2
 
-        # Sauvegarder dans session_state pour persistance
-        st.session_state.buyer_max_price[buyer_name][p['id']] = max_price_input
+            max_price_input = st.number_input(
+                f"Prix max – {p['id']}", 
+                min_value=price,
+                value=st.session_state.buyer_max_price[buyer_name][p['id']],
+                key=f"max_{p['id']}_{buyer_name}"
+            )
+
+            # Sauvegarder pour persistance
+            st.session_state.buyer_max_price[buyer_name][p['id']] = max_price_input
+        else:
+            max_price_input = price + 2
 
         buyer_products[p["id"]] = {
             "qty_desired": qty,
@@ -106,6 +110,24 @@ if st.session_state.buyers:
     st.dataframe(buyers_to_df(st.session_state.buyers))
 else:
     st.info("Aucun acheteur pour le moment.")
+
+# -----------------------------
+# Modifier le prix max des acheteurs existants
+# -----------------------------
+st.subheader("✏️ Modifier les prix max des acheteurs")
+if st.session_state.buyers:
+    for idx, buyer in enumerate(st.session_state.buyers):
+        st.markdown(f"**{buyer['name']}**")
+        for pid, prod in buyer["products"].items():
+            new_max = st.number_input(
+                f"Prix max – {pid} ({buyer['name']})",
+                min_value=prod["current_price"],
+                value=prod["max_price"],
+                key=f"edit_max_{buyer['name']}_{pid}"
+            )
+            st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
+            if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
+                st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
 
 # -----------------------------
 # Lancer simulation
@@ -159,14 +181,11 @@ if st.session_state.history:
 # Recommandations pour nouvel acheteur
 # -----------------------------
 st.subheader("💡 Recommandation de prix/quantité pour un nouvel acheteur")
-
 if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
         st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
     else:
-        # Calculer recommandations
         recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name="Nouvel Acheteur")
-        
         rec_rows = []
         for pid, rec in recs.items():
             can_allocate_all = rec["recommended_qty"] > 0
