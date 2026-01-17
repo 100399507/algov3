@@ -54,12 +54,14 @@ with st.sidebar.form("add_buyer_form"):
     for p in products:
         st.markdown(f"**{p['name']} ({p['id']})**")
 
+        multiple = p["volume_multiple"]
+        min_qty = max(p["seller_moq"], multiple)
+
         qty = st.number_input(
-            f"Qté désirée – {p['id']}",
-            min_value=p["seller_moq"],
-            value=p["seller_moq"],
-            step=5,
-            key=f"qty_{p['id']}"
+        f"Qté désirée – {p['id']}",
+        min_value=min_qty,
+        value=min_qty,
+        step=multiple
         )
 
         price = st.number_input(
