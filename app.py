@@ -64,12 +64,22 @@ with st.sidebar.form("add_buyer_form"):
         step=multiple
         )
 
+        # Déterminer le current_price minimal possible pour ce produit
+        current_price_min = p["starting_price"]  # valeur par défaut
+        if st.session_state.buyers:
+            # On cherche le max du current_price pour ce produit parmi tous les acheteurs
+            current_price_min = max(
+                b["products"][p["id"]]["current_price"] for b in st.session_state.buyers if p["id"] in b["products"]
+            )
+        
+        # Champ input avec min_value=current_price_min
         price = st.number_input(
             f"Prix courant – {p['id']}",
-            min_value=0.0,
-            value=p["starting_price"],
-            key=f"price_{p['id']}"
+            min_value=current_price_min,
+            value=current_price_min,
+            step=0.1
         )
+
 
         max_price = st.number_input(
             f"Prix max – {p['id']}",
