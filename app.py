@@ -153,19 +153,5 @@ if st.button("📊 Calculer recommandations"):
                 "Status": status_msg
             })
         
-        # Affichage tableau
-        df_recs = pd.DataFrame(rec_rows)
-        st.dataframe(df_recs)
-
-        # Visualisation graphique
-        st.subheader("📈 Visualisation du stock restant et prix recommandé")
-        chart_data = pd.DataFrame({
-            "Produit": [r["Produit"] for r in rec_rows],
-            "Stock restant": [r["Stock restant"] for r in rec_rows],
-            "Prix recommandé": [r["Prix recommandé (€)"] for r in rec_rows]
-        }).set_index("Produit")
-        
-        st.bar_chart(chart_data[["Stock restant"]])
-        st.line_chart(chart_data[["Prix recommandé"]])
-
+     
 
