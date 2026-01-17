@@ -4,7 +4,6 @@ import copy
 from allocation_algo import solve_model, run_auto_bid_aggressive
 from allocation_recommendation import calculate_optimal_bid
 
-
 # -----------------------------
 # Produits exemples
 # -----------------------------
@@ -41,14 +40,53 @@ def buyers_to_df(buyers):
     return pd.DataFrame(rows)
 
 # -----------------------------
-# Ajouter un acheteur
+# Ajouter un acheteur (version corrigée du bug prix max)
 # -----------------------------
 st.sidebar.title("➕ Ajouter un acheteur")
 with st.sidebar.form("add_buyer_form"):
     buyer_name = st.text_input("Nom acheteur")
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
-buyer_products = {} for p in products: st.markdown(f"**{p['name']} ({p['id']})**") qty = st.number_input(f"Qté désirée – {p['id']}", min_value=p["seller_moq"], value=p["seller_moq"], step=5) price = st.number_input(f"Prix courant – {p['id']}", min_value=0.0, value=p["starting_price"]) max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=price) buyer_products[p["id"]] = { "qty_desired": qty, "current_price": price, "max_price": max_price_input, "moq": p["seller_moq"] }
+    buyer_products = {}
+    for p in products:
+        st.markdown(f"**{p['name']} ({p['id']})**")
+        
+        qty = st.number_input(
+            f"Qté désirée – {p['id']}", 
+            min_value=p["seller_moq"], 
+            value=p["seller_moq"], 
+            step=5,
+            key=f"qty_{p['id']}_{buyer_name}"
+        )
+        
+        price = st.number_input(
+            f"Prix courant – {p['id']}", 
+            min_value=0.0, 
+            value=p["starting_price"],
+            key=f"price_{p['id']}_{buyer_name}"
+        )
+        
+        # Prix max : prend la valeur saisie par l'utilisateur ou le current price si aucune valeur
+        max_price_input = st.number_input(
+            f"Prix max – {p['id']}", 
+            min_value=price, 
+            value=st.session_state.get('buyer_max_price', {}).get(buyer_name, {}).get(p['id'], price),
+            key=f"max_{p['id']}_{buyer_name}"
+        )
+        
+        # Sauvegarde dans session_state pour persistance
+        if 'buyer_max_price' not in st.session_state:
+            st.session_state['buyer_max_price'] = {}
+        if buyer_name not in st.session_state['buyer_max_price']:
+            st.session_state['buyer_max_price'][buyer_name] = {}
+        st.session_state['buyer_max_price'][buyer_name][p['id']] = max_price_input
+
+        buyer_products[p["id"]] = {
+            "qty_desired": qty,
+            "current_price": price,
+            "max_price": max_price_input,
+            "moq": p["seller_moq"]
+        }
 
     submitted = st.form_submit_button("Ajouter acheteur")
     if submitted and buyer_name:
@@ -58,43 +96,6 @@ buyer_products = {} for p in products: st.markdown(f"**{p['name']} ({p['id']})**
             "auto_bid": auto_bid
         })
         st.success(f"Acheteur {buyer_name} ajouté !")
-
-# -----------------------------
-# Modifier le prix max des acheteurs (compact)
-# -----------------------------
-st.subheader("✏️ Modifier les prix max des acheteurs")
-if st.session_state.buyers:
-    for idx, buyer in enumerate(st.session_state.buyers):
-        cols = st.columns(len(products))
-        for col, (pid, prod) in zip(cols, buyer["products"].items()):
-            with col:
-                new_max = st.number_input(
-                    f"{buyer['name']} – {pid}",
-                    min_value=prod["current_price"],
-                    value=prod["max_price"],
-                    key=f"max_{buyer['name']}_{pid}"
-                )
-                st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
-                if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
-                    st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
-
-# -----------------------------
-# Affichage des produits
-# -----------------------------
-st.subheader("📦 Produits disponibles")
-prod_rows = []
-for p in products:
-    prod_rows.append({
-        "ID Produit": p["id"],
-        "Nom": p["name"],
-        "Stock disponible": p["stock"],
-        "Volume multiple": p["volume_multiple"],
-        "Prix de départ": p["starting_price"],
-        "MOQ vendeur": p["seller_moq"]
-    })
-st.dataframe(pd.DataFrame(prod_rows))
-
-
 
 # -----------------------------
 # Affichage acheteurs
@@ -152,6 +153,7 @@ if st.session_state.history:
                 })
         st.dataframe(pd.DataFrame(alloc_rows))
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
+
 
 # -----------------------------
 # Recommandations pour nouvel acheteur
