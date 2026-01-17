@@ -132,18 +132,40 @@ if st.session_state.history:
 # Recommandations pour nouvel acheteur
 # -----------------------------
 st.subheader("💡 Recommandation de prix/quantité pour un nouvel acheteur")
+
 if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
         st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
     else:
+        # Calculer recommandations
         recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name="Nouvel Acheteur")
+        
         rec_rows = []
         for pid, rec in recs.items():
+            can_allocate_all = rec["recommended_qty"] > 0
+            status_msg = "✅ Peut sécuriser le stock" if can_allocate_all else "⚠️ Pas assez de stock disponible"
+            
             rec_rows.append({
                 "Produit": pid,
-                "Prix recommandé": rec["recommended_price"],
+                "Prix recommandé (€)": rec["recommended_price"],
                 "Quantité recommandée": rec["recommended_qty"],
-                "Stock restant": rec["remaining_stock"]
+                "Stock restant": rec["remaining_stock"],
+                "Status": status_msg
             })
-        st.dataframe(pd.DataFrame(rec_rows))
+        
+        # Affichage tableau
+        df_recs = pd.DataFrame(rec_rows)
+        st.dataframe(df_recs)
+
+        # Visualisation graphique
+        st.subheader("📈 Visualisation du stock restant et prix recommandé")
+        chart_data = pd.DataFrame({
+            "Produit": [r["Produit"] for r in rec_rows],
+            "Stock restant": [r["Stock restant"] for r in rec_rows],
+            "Prix recommandé": [r["Prix recommandé (€)"] for r in rec_rows]
+        }).set_index("Produit")
+        
+        st.bar_chart(chart_data[["Stock restant"]])
+        st.line_chart(chart_data[["Prix recommandé"]])
+
 
