@@ -86,6 +86,7 @@ with st.sidebar.form("add_buyer_form"):
         else:
             max_price_input = price + 2
 
+        # Mettre à jour buyer_products pour que max_price soit bien affiché
         buyer_products[p["id"]] = {
             "qty_desired": qty,
             "current_price": price,
@@ -125,7 +126,9 @@ if st.session_state.buyers:
                 value=prod["max_price"],
                 key=f"edit_max_{buyer['name']}_{pid}"
             )
+            # Met à jour la valeur dans session_state
             st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
+            # Si le current_price > nouveau max, on le corrige
             if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
                 st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
 
@@ -181,11 +184,14 @@ if st.session_state.history:
 # Recommandations pour nouvel acheteur
 # -----------------------------
 st.subheader("💡 Recommandation de prix/quantité pour un nouvel acheteur")
+
 if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
         st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
     else:
+        # Calculer recommandations
         recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name="Nouvel Acheteur")
+        
         rec_rows = []
         for pid, rec in recs.items():
             can_allocate_all = rec["recommended_qty"] > 0
@@ -198,4 +204,5 @@ if st.button("📊 Calculer recommandations"):
                 "Stock restant": rec["remaining_stock"],
                 "Status": status_msg
             })
+        
         st.dataframe(pd.DataFrame(rec_rows))
