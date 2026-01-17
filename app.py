@@ -4,6 +4,7 @@ import copy
 from allocation_algo import solve_model, run_auto_bid_aggressive
 from allocation_recommendation import calculate_optimal_bid
 
+
 # -----------------------------
 # Produits exemples
 # -----------------------------
@@ -20,6 +21,9 @@ if "buyers" not in st.session_state:
 
 if "history" not in st.session_state:
     st.session_state.history = []
+
+if "buyer_max_price" not in st.session_state:
+    st.session_state.buyer_max_price = {}
 
 # -----------------------------
 # Helpers
@@ -40,46 +44,43 @@ def buyers_to_df(buyers):
     return pd.DataFrame(rows)
 
 # -----------------------------
-# Ajouter un acheteur (version corrigée du bug prix max)
+# Ajouter un acheteur
 # -----------------------------
 st.sidebar.title("➕ Ajouter un acheteur")
 with st.sidebar.form("add_buyer_form"):
     buyer_name = st.text_input("Nom acheteur")
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
+    # Initialiser st.session_state pour le max_price du buyer
+    if buyer_name and buyer_name not in st.session_state.buyer_max_price:
+        st.session_state.buyer_max_price[buyer_name] = {p['id']: p["starting_price"] for p in products}
+
     buyer_products = {}
     for p in products:
         st.markdown(f"**{p['name']} ({p['id']})**")
-        
         qty = st.number_input(
             f"Qté désirée – {p['id']}", 
             min_value=p["seller_moq"], 
             value=p["seller_moq"], 
-            step=5,
+            step=5, 
             key=f"qty_{p['id']}_{buyer_name}"
         )
-        
         price = st.number_input(
             f"Prix courant – {p['id']}", 
             min_value=0.0, 
-            value=p["starting_price"],
+            value=p["starting_price"], 
             key=f"price_{p['id']}_{buyer_name}"
         )
-        
-        # Prix max : prend la valeur saisie par l'utilisateur ou le current price si aucune valeur
+
         max_price_input = st.number_input(
             f"Prix max – {p['id']}", 
-            min_value=price, 
-            value=st.session_state.get('buyer_max_price', {}).get(buyer_name, {}).get(p['id'], price),
+            min_value=price,
+            value=st.session_state.buyer_max_price[buyer_name][p['id']],
             key=f"max_{p['id']}_{buyer_name}"
         )
-        
-        # Sauvegarde dans session_state pour persistance
-        if 'buyer_max_price' not in st.session_state:
-            st.session_state['buyer_max_price'] = {}
-        if buyer_name not in st.session_state['buyer_max_price']:
-            st.session_state['buyer_max_price'][buyer_name] = {}
-        st.session_state['buyer_max_price'][buyer_name][p['id']] = max_price_input
+
+        # Sauvegarder dans session_state pour persistance
+        st.session_state.buyer_max_price[buyer_name][p['id']] = max_price_input
 
         buyer_products[p["id"]] = {
             "qty_desired": qty,
@@ -154,7 +155,6 @@ if st.session_state.history:
         st.dataframe(pd.DataFrame(alloc_rows))
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
 
-
 # -----------------------------
 # Recommandations pour nouvel acheteur
 # -----------------------------
@@ -179,5 +179,4 @@ if st.button("📊 Calculer recommandations"):
                 "Stock restant": rec["remaining_stock"],
                 "Status": status_msg
             })
-        
         st.dataframe(pd.DataFrame(rec_rows))
