@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import copy
 from allocation_algo import solve_model, run_auto_bid_aggressive
+from allocation_recommendation import calculate_optimal_bid
+
 
 # -----------------------------
 # Produits exemples
@@ -124,3 +126,24 @@ if st.session_state.history:
                 })
         st.dataframe(pd.DataFrame(alloc_rows))
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
+
+
+# -----------------------------
+# Recommandations pour nouvel acheteur
+# -----------------------------
+st.subheader("💡 Recommandation de prix/quantité pour un nouvel acheteur")
+if st.button("📊 Calculer recommandations"):
+    if not st.session_state.buyers:
+        st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
+    else:
+        recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name="Nouvel Acheteur")
+        rec_rows = []
+        for pid, rec in recs.items():
+            rec_rows.append({
+                "Produit": pid,
+                "Prix recommandé": rec["recommended_price"],
+                "Quantité recommandée": rec["recommended_qty"],
+                "Stock restant": rec["remaining_stock"]
+            })
+        st.dataframe(pd.DataFrame(rec_rows))
+
