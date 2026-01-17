@@ -71,24 +71,23 @@ with st.sidebar.form("add_buyer_form"):
         st.success(f"Acheteur {buyer_name} ajouté !")
 
 # -----------------------------
-# Modifier le prix max des acheteurs existants
+# Modifier le prix max des acheteurs (compact)
 # -----------------------------
 st.subheader("✏️ Modifier les prix max des acheteurs")
 if st.session_state.buyers:
     for idx, buyer in enumerate(st.session_state.buyers):
-        st.markdown(f"**{buyer['name']}**")
-        for pid, prod in buyer["products"].items():
-            new_max = st.number_input(
-                f"Prix max – {pid} ({buyer['name']})",
-                min_value=prod["current_price"],
-                value=prod["max_price"],
-                key=f"max_{buyer['name']}_{pid}"
-            )
-            # Met à jour la valeur dans session_state
-            st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
-            # Si le current_price > nouveau max, on le corrige
-            if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
-                st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
+        cols = st.columns(len(products))
+        for col, (pid, prod) in zip(cols, buyer["products"].items()):
+            with col:
+                new_max = st.number_input(
+                    f"{buyer['name']} – {pid}",
+                    min_value=prod["current_price"],
+                    value=prod["max_price"],
+                    key=f"max_{buyer['name']}_{pid}"
+                )
+                st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
+                if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
+                    st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
 
 # -----------------------------
 # Affichage des produits
