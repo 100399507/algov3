@@ -40,69 +40,79 @@ def buyers_to_df(buyers):
     return pd.DataFrame(rows)
 
 # -----------------------------
-# Ajouter un acheteur
+# Ajouter un acheteur / simuler
 # -----------------------------
-st.sidebar.title("➕ Ajouter un acheteur")
+st.sidebar.title("➕ Ajouter / Simuler un acheteur")
+
 with st.sidebar.form("add_buyer_form"):
     buyer_name = st.text_input("Nom acheteur")
+
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
-    buyer_products = {}
+    draft_products = {}
+
     for p in products:
         st.markdown(f"**{p['name']} ({p['id']})**")
-        qty = st.number_input(f"Qté désirée – {p['id']}", min_value=p["seller_moq"], value=p["seller_moq"], step=5)
-        price = st.number_input(f"Prix courant – {p['id']}", min_value=0.0, value=p["starting_price"])
-        max_price_input = st.number_input(f"Prix max – {p['id']}", min_value=price, value=price+2)
-        buyer_products[p["id"]] = {
+
+        qty = st.number_input(
+            f"Qté désirée – {p['id']}",
+            min_value=p["seller_moq"],
+            value=p["seller_moq"],
+            step=5,
+            key=f"qty_{p['id']}"
+        )
+
+        price = st.number_input(
+            f"Prix courant – {p['id']}",
+            min_value=0.0,
+            value=p["starting_price"],
+            key=f"price_{p['id']}"
+        )
+
+        max_price = st.number_input(
+            f"Prix max – {p['id']}",
+            min_value=price,
+            value=price,
+            key=f"max_{p['id']}"
+        )
+
+        draft_products[p["id"]] = {
             "qty_desired": qty,
             "current_price": price,
-            "max_price": max_price_input,
+            "max_price": max_price,
             "moq": p["seller_moq"]
         }
 
-    submitted = st.form_submit_button("Ajouter acheteur")
-    if submitted and buyer_name:
-        st.session_state.buyers.append({
-            "name": buyer_name,
-            "products": buyer_products,
-            "auto_bid": auto_bid
-        })
-        st.success(f"Acheteur {buyer_name} ajouté !")
+    add_submit = st.form_submit_button("➕ Ajouter acheteur")
+    simulate_submit = st.form_submit_button("🧪 Simuler allocation")
 
 
 # -----------------------------
-# Simulation "what-if" sans impact
+# Actions formulaire
 # -----------------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("🧪 Simulation sans engagement")
+if add_submit and buyer_name:
+    st.session_state.buyers.append({
+        "name": buyer_name,
+        "products": copy.deepcopy(draft_products),
+        "auto_bid": auto_bid
+    })
+    st.success(f"Acheteur {buyer_name} ajouté")
 
-with st.sidebar.form("simulation_form"):
-    sim_price = st.number_input("Prix simulé (€)", min_value=0.0, value=10.0)
-    sim_qty = st.number_input("Quantité souhaitée", min_value=0, value=100, step=10)
-    sim_submit = st.form_submit_button("▶️ Simuler allocation")
-
-if sim_submit:
+if simulate_submit:
     buyers_sim = copy.deepcopy(st.session_state.buyers)
 
     simulated_buyer = {
         "name": "__SIMULATION__",
-        "auto_bid": False,
-        "products": {}
+        "products": draft_products,
+        "auto_bid": False
     }
-
-    for p in products:
-        simulated_buyer["products"][p["id"]] = {
-            "qty_desired": sim_qty,
-            "current_price": sim_price,
-            "max_price": sim_price,
-            "moq": p["seller_moq"]
-        }
 
     buyers_sim.append(simulated_buyer)
 
     allocations, _ = solve_model(buyers_sim, products)
 
     st.session_state.simulation_result = allocations.get("__SIMULATION__", {})
+
 
 
 # -----------------------------
@@ -212,18 +222,17 @@ if st.button("📊 Calculer recommandations"):
         
         st.dataframe(pd.DataFrame(rec_rows))
 
-
 # -----------------------------
 # Résultat simulation
 # -----------------------------
 if "simulation_result" in st.session_state:
-    st.subheader("🧪 Résultat de la simulation (sans engagement)")
+    st.subheader("🧪 Résultat de la simulation")
 
     rows = []
     for pid, qty in st.session_state.simulation_result.items():
         rows.append({
             "Produit": pid,
-            "Quantité demandée": sim_qty,
+            "Quantité demandée": st.session_state[f"qty_{pid}"],
             "Quantité allouée": qty,
             "Statut": "✅ Alloué" if qty > 0 else "❌ Non alloué"
         })
