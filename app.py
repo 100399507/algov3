@@ -33,7 +33,7 @@ def buyers_to_df(buyers):
                 "Qté désirée": p["qty_desired"],
                 "MOQ produit": p["moq"],
                 "Prix courant": p["current_price"],
-                "Prix max": p["max_price"],
+                "Prix max": p["max_price"],  # Toujours valeur saisie
                 "Auto-bid": b.get("auto_bid", False)
             })
     return pd.DataFrame(rows)
@@ -92,7 +92,8 @@ if st.button("▶️ Lancer simulation avec auto-bid"):
             "itération": iteration+1,
             "allocations": copy.deepcopy(allocations),
             "total_ca": total_ca,
-            "prices": {b["name"]: {pid: b["products"][pid]["current_price"] for pid in b["products"]} for b in buyers_copy}
+            "current_prices": {b["name"]: {pid: b["products"][pid]["current_price"] for pid in b["products"]} for b in buyers_copy},
+            "max_prices": {b["name"]: {pid: b["products"][pid]["max_price"] for pid in b["products"]} for b in buyers_copy}
         })
         buyers_copy_new = run_auto_bid_aggressive(buyers_copy, products, max_rounds=1)
         if buyers_copy_new == buyers_copy:
@@ -111,13 +112,15 @@ if st.session_state.history:
         alloc_rows = []
         for buyer_name, prods in h["allocations"].items():
             for pid, qty in prods.items():
-                price = h["prices"][buyer_name][pid]
+                current_price = h["current_prices"][buyer_name][pid]
+                max_price = h["max_prices"][buyer_name][pid]
                 alloc_rows.append({
                     "Acheteur": buyer_name,
                     "Produit": pid,
-                    "Prix courant": price,
+                    "Prix courant": current_price,
+                    "Prix max saisi": max_price,
                     "Quantité allouée": qty,
-                    "CA ligne": qty * price
+                    "CA ligne": qty * current_price
                 })
         st.dataframe(pd.DataFrame(alloc_rows))
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
