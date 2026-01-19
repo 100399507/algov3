@@ -1,7 +1,7 @@
 import copy
 from allocation_algo import solve_model
 
-def calculate_optimal_bid(buyers, products, user_qtys, new_buyer_name="Nouvel Acheteur"):
+def calculate_optimal_bid(buyers, products, user_qtys, user_prices, new_buyer_name="Nouvel Acheteur"):
     """
     Calcule pour un nouvel acheteur le prix minimal à proposer pour obtenir
     la quantité souhaitée par l'utilisateur si elle dépasse le stock restant,
