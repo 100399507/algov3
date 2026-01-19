@@ -31,53 +31,49 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
             (b["products"][prod_id]["max_price"] for b in buyers_copy), default=0
         )
 
-        # Quantité souhaitée par le nouvel acheteur
-        qty_desired = product.get("qty_desired", remaining_stock)  # ex: 400
+        # Quantité réellement souhaitée par l’acheteur simulé
+        qty_desired = product["qty_desired"]
 
-        # Cas 1 : stock suffisant pour la quantité souhaitée
-        if remaining_stock >= qty_desired:
+        # 👉 ON TESTE D’ABORD SANS INCRÉMENT
+        temp_buyer = {
+            "name": new_buyer_name,
+            "products": {
+                prod_id: {
+                    "qty_desired": qty_desired,
+                    "current_price": max_competitor_price,
+                    "max_price": max_competitor_price,
+                    "moq": product.get("seller_moq", 1)
+                }
+            },
+            "auto_bid": False
+        }
+
+        allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+        alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+
+        # ✅ Si le prix courant suffit → PAS d’incrément
+        if alloc >= qty_desired:
             recommended_price = max_competitor_price
+
+        # ❌ Sinon → auto-bid obligatoire
         else:
-            # Cas 2 : stock insuffisant → appliquer premier incrément auto-bid
             step = max(min_step, max_competitor_price * pct_step)
-            test_price = max_competitor_price + step
-            # Arrondi au multiple de step
-            test_price = math.ceil(test_price / step) * step
+            test_price = math.ceil((max_competitor_price + step) / step) * step
 
-            temp_buyer = {
-                "name": new_buyer_name,
-                "products": {
-                    prod_id: {
-                        "qty_desired": qty_desired,
-                        "current_price": test_price,
-                        "max_price": test_price,
-                        "moq": product.get("seller_moq", 1)
-                    }
-                },
-                "auto_bid": False
-            }
+            while test_price < max_competitor_price + 1000:
+                temp_buyer["products"][prod_id]["current_price"] = test_price
+                temp_buyer["products"][prod_id]["max_price"] = test_price
 
-            # Tester allocation
-            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+                allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+                alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
-            if alloc >= qty_desired:
-                recommended_price = test_price
+                if alloc >= qty_desired:
+                    recommended_price = test_price
+                    break
+
+                test_price = math.ceil((test_price + step) / step) * step
             else:
-                # Boucle d’incrémentation progressive
-                while test_price < max_competitor_price + 1000:
-                    test_price = max(test_price + step, math.ceil(test_price / step) * step)
-                    temp_buyer["products"][prod_id]["current_price"] = test_price
-                    temp_buyer["products"][prod_id]["max_price"] = test_price
-
-                    allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-                    alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
-
-                    if alloc >= qty_desired:
-                        recommended_price = test_price
-                        break
-                else:
-                    recommended_price = max_competitor_price + 1000
+                recommended_price = max_competitor_price + 1000
 
         recommendations[prod_id] = {
             "recommended_price": round(recommended_price, 2),
