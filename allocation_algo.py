@@ -132,19 +132,51 @@ def run_auto_bid_aggressive(
                     continue
 
                 best_price = current_price
+### Code en commentaire avec incrémentation fixe 
+                
+               # for inc in [0.5, 1.0 , 2.0 , 3.0 , 5.0 , 10.0]:
+                   # test_price = min(current_price + inc, max_price)
+                   # if test_price <= current_price:
+                        #continue
 
-                for inc in [0.5, 1.0 , 2.0 , 3.0 , 5.0 , 10.0]:
-                    test_price = min(current_price + inc, max_price)
+                    #prod_conf["current_price"] = test_price
+                    #new_allocs, _ = solve_model(current_buyers, products)
+
+                  #  if new_allocs[buyer_name][prod_id] > current_alloc:
+                        #best_price = test_price
+                        #current_alloc = new_allocs[buyer_name][prod_id]
+                       # changes_made = True
+## Fin du code en commentaire
+            
+                min_step = 0.1          # incrément minimum absolu
+                pct_step = 0.05         # 5% du prix courant
+            
+                while True:
+                    step = max(min_step, current_price * pct_step)
+                
+                    # Accélération si allocation loin de l'objectif
+                    if qty_desired > 0:
+                        gap_ratio = 1 - (current_alloc / qty_desired)
+                        step *= (1 + gap_ratio)
+                
+                    test_price = min(current_price + step, max_price)
+                
                     if test_price <= current_price:
-                        continue
-
+                        break
+                
                     prod_conf["current_price"] = test_price
                     new_allocs, _ = solve_model(current_buyers, products)
-
+                
                     if new_allocs[buyer_name][prod_id] > current_alloc:
                         best_price = test_price
                         current_alloc = new_allocs[buyer_name][prod_id]
                         changes_made = True
+                
+                        # On continue tant que ça améliore, même jusqu'au max_price
+                        if test_price == max_price:
+                            break
+                    else:
+                        break
 
                 prod_conf["current_price"] = min(best_price, max_price)
 
