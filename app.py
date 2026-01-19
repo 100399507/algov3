@@ -233,9 +233,9 @@ if st.session_state.history:
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
 
 # -----------------------------
-# Recommandations pour nouvel acheteur
+# Recommandations pour nouvel acheteur simplifiées
 # -----------------------------
-st.subheader("💡 Recommandation de prix/quantité pour un nouvel acheteur")
+st.subheader("💡 Recommandation de prix pour un nouvel acheteur")
 
 if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
@@ -246,32 +246,9 @@ if st.button("📊 Calculer recommandations"):
         
         rec_rows = []
         for pid, rec in recs.items():
-            can_allocate_all = rec["recommended_qty"] > 0
-            status_msg = "✅ Peut sécuriser le stock" if can_allocate_all else "⚠️ Pas assez de stock disponible"
-            
             rec_rows.append({
                 "Produit": pid,
-                "Prix recommandé (€)": rec["recommended_price"],
-                "Quantité recommandée": rec["recommended_qty"],
-                "Stock restant": rec["remaining_stock"],
-                "Status": status_msg
+                "Prix recommandé (€)": rec["recommended_price"]
             })
         
-        st.dataframe(pd.DataFrame(rec_rows))
-
-# -----------------------------
-# Résultat simulation
-# -----------------------------
-if "simulation_result" in st.session_state:
-    st.subheader("🧪 Résultat de la simulation")
-
-    rows = []
-    for pid, qty in st.session_state.simulation_result.items():
-        rows.append({
-            "Produit": pid,
-            "Quantité demandée": st.session_state[f"qty_{pid}"],
-            "Quantité allouée": qty,
-            "Statut": "✅ Alloué" if qty > 0 else "❌ Non alloué"
-        })
-
-    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
