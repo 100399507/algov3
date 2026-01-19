@@ -1,177 +1,84 @@
-import pulp
 import copy
+from typing import List, Dict
+from allocation_algo import solve_model
 
-# -----------------------------
-# Fonctions principales
-# -----------------------------
-
-def round_to_multiple(value, multiple):
-    if multiple <= 0:
-        return int(value)
-    return int(round(value / multiple) * multiple)
-
-def solve_model(buyers, products, seller_global_moq=80):
-    """Résout le modèle multi-produits avec MOQ Global"""
-    if not buyers:
-        return {}, 0.0
-
-    model = pulp.LpProblem("Sequential_Auction", pulp.LpMaximize)
-
-    x = {}
-    y = {}
-    z = {}
-    n_mult = {}
-
-    # Variables
-    for buyer in buyers:
-        buyer_name = buyer["name"]
-        z[buyer_name] = pulp.LpVariable(f"z_{buyer_name}", lowBound=0, upBound=1, cat="Binary")
-
-        for product in products:
-            prod_id = product["id"]
-            x[(buyer_name, prod_id)] = pulp.LpVariable(f"x_{buyer_name}_{prod_id}", lowBound=0)
-            y[(buyer_name, prod_id)] = pulp.LpVariable(f"y_{buyer_name}_{prod_id}", lowBound=0, upBound=1, cat="Binary")
-            n_mult[(buyer_name, prod_id)] = pulp.LpVariable(f"n_{buyer_name}_{prod_id}", lowBound=0, cat="Integer")
-
-    # Fonction objectif
-    revenue_terms = []
-    for buyer in buyers:
-        for prod_id in buyer["products"]:
-            buyer_name = buyer["name"]
-            price = buyer["products"][prod_id]["current_price"]
-            revenue_terms.append(price * x[(buyer_name, prod_id)])
-    model += pulp.lpSum(revenue_terms)
-
-    # Contraintes par produit
-    for product in products:
-        prod_id = product["id"]
-        volume_multiple = product["volume_multiple"]
-        stock_terms = [x[(b["name"], prod_id)] for b in buyers]
-        if stock_terms:
-            model += pulp.lpSum(stock_terms) <= product["stock"]
-        for buyer in buyers:
-            model += x[(buyer["name"], prod_id)] == volume_multiple * n_mult[(buyer["name"], prod_id)]
-
-    # Contraintes par acheteur
-    for buyer in buyers:
-        buyer_name = buyer["name"]
-        total_alloc_terms = [x[(buyer_name, prod_id)] for prod_id in buyer["products"]]
-        model += pulp.lpSum(total_alloc_terms) >= seller_global_moq * z[buyer_name]
-
-        for prod_id, prod_conf in buyer["products"].items():
-            big_m = 10000
-            model += x[(buyer_name, prod_id)] <= big_m * z[buyer_name]
-            model += x[(buyer_name, prod_id)] >= prod_conf["moq"] * y[(buyer_name, prod_id)]
-            model += x[(buyer_name, prod_id)] <= prod_conf["qty_desired"] * y[(buyer_name, prod_id)]
-            model += y[(buyer_name, prod_id)] <= z[buyer_name]
-
-    # Résolution
-    model.solve(pulp.PULP_CBC_CMD(msg=False))
-
-    allocations = {}
-    total_ca = 0.0
-
-    for buyer in buyers:
-        allocations[buyer["name"]] = {}
-        buyer_total = 0
-
-        for prod_id in buyer["products"]:
-            alloc_value = x[(buyer["name"], prod_id)].value() or 0
-            volume_multiple = next(p["volume_multiple"] for p in products if p["id"] == prod_id)
-            alloc_value = round_to_multiple(alloc_value, volume_multiple)
-            buyer_total += alloc_value
-
-        if buyer_total < seller_global_moq:
-            for prod_id in buyer["products"]:
-                allocations[buyer["name"]][prod_id] = 0
-        else:
-            for prod_id in buyer["products"]:
-                alloc_value = x[(buyer["name"], prod_id)].value() or 0
-                volume_multiple = next(p["volume_multiple"] for p in products if p["id"] == prod_id)
-                alloc_value = round_to_multiple(alloc_value, volume_multiple)
-                allocations[buyer["name"]][prod_id] = alloc_value
-                total_ca += alloc_value * buyer["products"][prod_id]["current_price"]
-
-    return allocations, total_ca
-
-# -----------------------------
-# Auto-bid agressif corrigé
-# -----------------------------
-def run_auto_bid_aggressive(buyers, products, max_rounds=30):
+def calculate_optimal_bid(
+    buyers: List[Dict],
+    products: List[Dict],
+    new_buyer_name: str = "Nouvel Acheteur"
+) -> Dict[str, Dict]:
     """
-    Applique l'auto-bid avant de résoudre le solveur.
-    Les prix sont augmentés progressivement jusqu'au prix minimal nécessaire
-    pour obtenir l'allocation maximale possible ou la quantité désirée.
-    Arrête l'incrément si l'acheteur atteint sa qty_desired.
+    Calcule pour un nouvel acheteur le prix et la quantité à proposer
+    pour obtenir 100% du stock disponible, en utilisant le même pas
+    que l'auto-bid agressif pour que le résultat retombe sur le même chiffre.
     """
-    current_buyers = copy.deepcopy(buyers)
+    buyers_copy = copy.deepcopy(buyers)
+    recommendations = {}
+
     min_step = 0.1
     pct_step = 0.05
 
-    for _ in range(max_rounds):
-        changes_made = False
+    for product in products:
+        prod_id = product["id"]
+        stock_available = product["stock"]
 
-        # Trier les acheteurs par prix max décroissant pour prioriser les plus payants
-        buyers_sorted = sorted(
-            current_buyers,
-            key=lambda b: max(p["max_price"] for p in b["products"].values()),
-            reverse=True
-        )
+        # Allocation actuelle sans le nouvel acheteur
+        allocations, _ = solve_model(buyers_copy, products)
+        total_allocated = sum(allocations[b["name"]][prod_id] for b in buyers_copy)
+        remaining_stock = max(stock_available - total_allocated, 0)
 
-        for buyer in buyers_sorted:
-            if not buyer.get("auto_bid", False):
-                continue
-            buyer_name = buyer["name"]
+        if remaining_stock == 0:
+            recommendations[prod_id] = {
+                "recommended_price": 0.0,
+                "recommended_qty": 0,
+                "remaining_stock": 0
+            }
+            continue
 
-            for prod_id, prod_conf in buyer["products"].items():
-                current_price = prod_conf["current_price"]
-                max_price = prod_conf["max_price"]
-                qty_desired = prod_conf["qty_desired"]
+        # Prix max actuel parmi les autres acheteurs
+        max_competitor_price = 0
+        for b in buyers_copy:
+            if prod_id in b["products"]:
+                max_price = b["products"][prod_id]["max_price"]
+                if max_price > max_competitor_price:
+                    max_competitor_price = max_price
 
-                # allocation actuelle
-                allocations, _ = solve_model(current_buyers, products)
-                current_alloc = allocations[buyer_name][prod_id]
+        # Départ du prix au-dessus du max concurrent
+        test_price = max_competitor_price
+        recommended_price = test_price
 
-                # Si déjà atteint la quantité désirée, ne pas incrémenter
-                if current_alloc >= qty_desired:
-                    continue
+        # Incrémenter avec le même step que l'auto-bid
+        while test_price < test_price + 100:  # limite haute arbitraire
+            step = max(min_step, test_price * pct_step)
+            next_price = round(test_price + step, 2)
 
-                # 1️⃣ Test prix max pour voir si l’acheteur peut obtenir plus
-                prod_conf["current_price"] = max_price
-                max_allocs, _ = solve_model(current_buyers, products)
-                max_alloc = max_allocs[buyer_name][prod_id]
-                target_alloc = min(max_alloc, qty_desired)
+            # Buyer temporaire
+            temp_buyer = {
+                "name": new_buyer_name,
+                "products": {
+                    prod_id: {
+                        "qty_desired": remaining_stock,
+                        "current_price": next_price,
+                        "max_price": next_price,
+                        "moq": product["seller_moq"]
+                    }
+                },
+                "auto_bid": False
+            }
 
-                # Si le max_price n’augmente pas l’allocation, revenir au prix courant
-                if target_alloc <= current_alloc:
-                    prod_conf["current_price"] = current_price
-                    continue
+            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
-                # 2️⃣ Incrément progressif
-                test_price = current_price
-                while test_price < max_price:
-                    step = max(min_step, test_price * pct_step)
-                    next_price = min(test_price + step, max_price)
+            if alloc >= remaining_stock:
+                recommended_price = next_price
+                break
 
-                    
+            test_price = next_price
 
-                    prod_conf["current_price"] = next_price
-                    new_allocs, _ = solve_model(current_buyers, products)
-                    new_alloc = new_allocs[buyer_name][prod_id]
+        recommendations[prod_id] = {
+            "recommended_price": recommended_price,
+            "recommended_qty": remaining_stock,
+            "remaining_stock": remaining_stock
+        }
 
-                    # Stop dès que l'acheteur atteint la target
-                    if new_alloc >= target_alloc:
-                        test_price = next_price
-                        changes_made = True
-                        break
-                    test_price = next_price
-                    changes_made = True
-
-                prod_conf["current_price"] = round(test_price,2)
-
-        if not changes_made:
-            break
-
-    # Résolution finale pour allocations finales après auto-bid
-    solve_model(current_buyers, products)
-    return current_buyers
+    return recommendations
