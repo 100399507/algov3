@@ -300,7 +300,29 @@ if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
         st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
     else:
-        recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name="Nouvel Acheteur")
+        # On crée un buyer temporaire "__SIMULATION__" à partir des valeurs max de chaque produit
+        user_qtys = {}
+        user_prices = {}
+        for p in products:
+            pid = p["id"]
+            # Quantité maximale possible = stock restant
+            user_qtys[pid] = p["stock"]
+            # Prix courant min = prix courant le plus bas parmi les acheteurs avec allocation sur ce produit
+            allocated_prices = [
+                b["products"][pid]["current_price"]
+                for b in st.session_state.buyers
+                if pid in b["products"] and b.get("allocated", {}).get(pid, 0) > 0
+            ]
+            user_prices[pid] = max(allocated_prices) if allocated_prices else p["starting_price"]
+
+        recs = simulate_optimal_bid(
+            st.session_state.buyers,
+            products,
+            user_qtys=user_qtys,
+            user_prices=user_prices,
+            new_buyer_name="__SIMULATION__"
+        )
+
         rec_rows = []
         for pid, rec in recs.items():
             rec_rows.append({
