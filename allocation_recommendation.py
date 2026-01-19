@@ -34,7 +34,43 @@ def calculate_optimal_bid(
                 max_competitor_price = max_price
 
         # Prix recommandé légèrement au-dessus du max concurrent
-        recommended_price = max_competitor_price + 0.1
+        # Step minimal et step en pourcentage comme dans l'auto-bid
+        min_step = 0.05
+        pct_step = 0.02
+        
+        # Départ du prix au-dessus du max concurrent
+        
+        test_price = max_competitor_price
+        while test_price < product["starting_price"] + 100:  # limite arbitraire pour éviter boucle infinie
+            # Incrément progressif
+            step = max(min_step, test_price * pct_step)
+            next_price = test_price + step
+        
+            # Créer un buyer temporaire avec ce prix
+            temp_buyer = {
+                "name": new_buyer_name,
+                "products": {
+                    prod_id: {
+                        "qty_desired": remaining_stock,
+                        "current_price": next_price,
+                        "max_price": next_price,
+                        "moq": product["seller_moq"]
+                    }
+                },
+                "auto_bid": False
+            }
+        
+            # Tester allocation avec ce prix
+            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+        
+            if alloc >= remaining_stock:
+                # Stock sécurisé : on peut s'arrêter
+                recommended_price = next_price
+                break
+        
+            test_price = next_price
+
 
         # Quantité à demander : tout le stock restant
         recommended_qty = remaining_stock
