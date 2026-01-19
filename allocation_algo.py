@@ -144,28 +144,30 @@ def run_auto_bid_aggressive(
                     prod_conf["current_price"] = current_price
                     continue
 
-                # 2️⃣ Incrément progressif jusqu'au prix minimal nécessaire
-                target_alloc = max_alloc
+                # 2️⃣ Incrément progressif jusqu'au prix minimal nécessaire ou qty_desired
+                target_alloc = min(max_alloc, prod_conf["qty_desired"])
                 test_price = current_price
 
                 while test_price < max_price:
                     step = max(min_step, test_price * pct_step)
                     next_price = min(test_price + step, max_price)
-
+                
                     prod_conf["current_price"] = next_price
                     new_allocs, _ = solve_model(current_buyers, products)
                     new_alloc = new_allocs[buyer_name][prod_id]
-
-                    if new_alloc >= target_alloc:
+                
+                    # Arrêter si l'allocation atteint la quantité désirée
+                    if new_alloc >= prod_conf["qty_desired"]:
                         test_price = next_price
                         changes_made = True
                         break
                     else:
                         test_price = next_price
                         changes_made = True
-
+                
                 # 3️⃣ Mettre à jour le prix final
                 prod_conf["current_price"] = test_price
+
 
         if not changes_made:
             break
