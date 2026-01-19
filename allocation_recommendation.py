@@ -3,20 +3,24 @@ import math
 from allocation_algo import solve_model
 
 
-def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
+def calculate_optimal_bid(
+    buyers,
+    products,
+    new_buyer_name="Nouvel Acheteur",
+    simulated_qty_by_product=None,  # 🔑 clé métier
+):
     """
-    Calcule pour un nouvel acheteur le prix minimal à proposer pour sécuriser
-    le stock restant, avec EXACTEMENT la logique d'incrémentation de l'auto-bid.
+    Recommandation de prix auto-bid exacte.
 
     Règles :
-    - Si le stock restant suffit → PAS d'incrément
-    - Si le stock restant est insuffisant → premier incrément auto-bid obligatoire
+    - qty_desired peut dépasser le stock restant
+    - allocation cible = min(qty_desired, remaining_stock)
+    - incrément seulement si allocation impossible au prix courant
     """
 
     buyers_copy = copy.deepcopy(buyers)
     recommendations = {}
 
-    # Paramètres auto-bid
     min_step = 0.1
     pct_step = 0.05
 
@@ -25,8 +29,10 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
         stock_available = product["stock"]
         moq = product.get("seller_moq", 1)
 
+        qty_desired = simulated_qty_by_product.get(prod_id, 0)
+
         # -----------------------------
-        # 1. Stock restant réel
+        # 1. Stock restant
         # -----------------------------
         allocations, _ = solve_model(buyers_copy, products)
         total_allocated = sum(
@@ -36,16 +42,15 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
 
         remaining_stock = max(stock_available - total_allocated, 0)
 
-        if remaining_stock <= 0:
+        if remaining_stock <= 0 or qty_desired <= 0:
             recommendations[prod_id] = {
                 "recommended_price": None,
                 "recommended_qty": 0,
-                "remaining_stock": 0
+                "remaining_stock": remaining_stock
             }
             continue
 
-        # Quantité que le nouvel acheteur peut réellement demander
-        qty_desired = remaining_stock
+        target_qty = min(qty_desired, remaining_stock)
 
         # -----------------------------
         # 2. Prix max concurrent
@@ -59,29 +64,29 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
                 )
 
         # -----------------------------
-        # 3. Test SANS incrément
+        # 3. Test sans incrément
         # -----------------------------
-        temp_buyer = {
-            "name": new_buyer_name,
-            "products": {
-                prod_id: {
-                    "qty_desired": qty_desired,
-                    "current_price": max_competitor_price,
-                    "max_price": max_competitor_price,
-                    "moq": moq
-                }
-            },
-            "auto_bid": False
-        }
+        def simulate(price):
+            temp_buyer = {
+                "name": new_buyer_name,
+                "products": {
+                    prod_id: {
+                        "qty_desired": qty_desired,
+                        "current_price": price,
+                        "max_price": price,
+                        "moq": moq
+                    }
+                },
+                "auto_bid": False
+            }
 
-        allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-        alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+            return allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
-        # ✔️ Stock suffisant → on s'arrête
-        if alloc >= qty_desired:
+        if simulate(max_competitor_price) >= target_qty:
             recommendations[prod_id] = {
                 "recommended_price": round(max_competitor_price, 2),
-                "recommended_qty": qty_desired,
+                "recommended_qty": target_qty,
                 "remaining_stock": remaining_stock
             }
             continue
@@ -90,20 +95,13 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
         # 4. Incrémentation auto-bid
         # -----------------------------
         step = max(min_step, max_competitor_price * pct_step)
-
         test_price = max_competitor_price + step
         test_price = math.ceil(test_price / step) * step
 
         recommended_price = None
 
         while test_price < max_competitor_price + 1000:
-            temp_buyer["products"][prod_id]["current_price"] = test_price
-            temp_buyer["products"][prod_id]["max_price"] = test_price
-
-            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
-
-            if alloc >= qty_desired:
+            if simulate(test_price) >= target_qty:
                 recommended_price = test_price
                 break
 
@@ -115,7 +113,7 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
 
         recommendations[prod_id] = {
             "recommended_price": round(recommended_price, 2),
-            "recommended_qty": qty_desired,
+            "recommended_qty": target_qty,
             "remaining_stock": remaining_stock
         }
 
