@@ -133,41 +133,63 @@ def run_auto_bid_aggressive(
 
                 best_price = current_price
 
-            min_step = 0.1
-            pct_step = 0.05
-            
-            while True:
-                # calcul incrément
-                step = max(min_step, current_price * pct_step)
-            
-                if qty_desired > 0:
-                    gap_ratio = 1 - (current_alloc / qty_desired)
-                    step *= (1 + gap_ratio)
-            
-                # prix candidat
-                test_price = min(current_price + step, max_price)
-            
-                # si incrément trop petit pour changer allocation, tester max_price
-                if test_price <= current_price and current_price < max_price:
-                    test_price = max_price
-            
-                if test_price <= current_price:
-                    break  # plus rien à faire
-            
-                prod_conf["current_price"] = test_price
-                new_allocs, _ = solve_model(current_buyers, products)
-            
-                if new_allocs[buyer_name][prod_id] > current_alloc:
-                    best_price = test_price
-                    current_alloc = new_allocs[buyer_name][prod_id]
-                    changes_made = True
-                    current_price = test_price  # update pour le next step
-                else:
-                    # si même max_price ne donne pas plus → stop
-                    if test_price == max_price:
-                        break
-                    # sinon on continue avec l'incrément suivant
-                    current_price = test_price
+           # -----------------------------
+# Parcours des acheteurs par prix max décroissant
+# -----------------------------
+# Trier les acheteurs selon le prix max le plus élevé parmi leurs produits
+buyers_sorted = sorted(
+    current_buyers,
+    key=lambda b: max(p["max_price"] for p in b["products"].values()),
+    reverse=True
+)
+
+for buyer in buyers_sorted:
+    if not buyer.get("auto_bid", False):
+        continue
+    buyer_name = buyer["name"]
+
+    for prod_id, prod_conf in buyer["products"].items():
+        qty_desired = prod_conf["qty_desired"]
+        current_price = prod_conf["current_price"]
+        max_price = prod_conf["max_price"]
+
+        # allocation actuelle
+        allocations, _ = solve_model(current_buyers, products)
+        current_alloc = allocations[buyer_name][prod_id]
+
+        # 1️⃣ Test max_price pour voir si l'acheteur peut obtenir plus
+        prod_conf["current_price"] = max_price
+        max_allocations, _ = solve_model(current_buyers, products)
+        max_alloc = max_allocations[buyer_name][prod_id]
+
+        if max_alloc <= current_alloc:
+            # pas besoin de bid, max_price n'améliore pas
+            prod_conf["current_price"] = current_price
+            continue
+
+        # 2️⃣ Incrément progressif jusqu'au prix minimal nécessaire
+        target_alloc = max_alloc
+        test_price = current_price
+        min_step = 0.1
+        pct_step = 0.05
+
+        while test_price < max_price:
+            step = max(min_step, test_price * pct_step)
+            next_price = min(test_price + step, max_price)
+
+            prod_conf["current_price"] = next_price
+            new_allocs, _ = solve_model(current_buyers, products)
+            new_alloc = new_allocs[buyer_name][prod_id]
+
+            if new_alloc >= target_alloc:
+                test_price = next_price
+                break
+            else:
+                test_price = next_price
+
+        # 3️⃣ Mettre à jour le prix final
+        prod_conf["current_price"] = test_price
+
 
                 prod_conf["current_price"] = min(best_price, max_price)
 
