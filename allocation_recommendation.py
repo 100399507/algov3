@@ -9,15 +9,14 @@ def calculate_optimal_bid(
 ) -> Dict[str, Dict]:
     """
     Calcule pour un nouvel acheteur le prix et la quantité à proposer
-    pour obtenir 100% du stock disponible, en reproduisant exactement
-    la logique de l'auto-bid pour le calcul du prix.
+    pour obtenir 100% du stock disponible, en appliquant le même 
+    mécanisme d'incrémentation que l'auto-bid (step minimal + pourcentage).
     """
     buyers_copy = copy.deepcopy(buyers)
     recommendations = {}
 
-    # Paramètres d'incrémentation identiques à run_auto_bid_aggressive
-    min_step = 0.1
-    pct_step = 0.05
+    min_step = 0.1     # step minimum
+    pct_step = 0.05    # step en pourcentage du prix courant
 
     for product in products:
         prod_id = product["id"]
@@ -25,11 +24,12 @@ def calculate_optimal_bid(
 
         # Allocation actuelle sans le nouvel acheteur
         allocations, _ = solve_model(buyers_copy, products)
-        total_allocated = sum(allocations[b["name"]][prod_id] for b in buyers_copy)
+        total_allocated = sum(
+            allocations[b["name"]][prod_id] for b in buyers_copy
+        )
         remaining_stock = max(stock_available - total_allocated, 0)
-
         if remaining_stock <= 0:
-            # Stock déjà totalement alloué
+            # Pas de stock dispo
             recommendations[prod_id] = {
                 "recommended_price": 0,
                 "recommended_qty": 0,
@@ -37,47 +37,48 @@ def calculate_optimal_bid(
             }
             continue
 
-        # Prix max parmi les concurrents (pour démarrer au-dessus)
-        max_competitor_price = 0
-        for b in buyers_copy:
-            max_price_b = b["products"][prod_id]["current_price"]
-            if max_price_b > max_competitor_price:
-                max_competitor_price = max_price_b
+        # Départ du prix : max entre prix de départ et prix max des concurrents
+        max_competitor_price = max(
+            [b["products"][prod_id]["current_price"] for b in buyers_copy if prod_id in b["products"]] + [product["starting_price"]]
+        )
+        test_price = max_competitor_price
 
-        # Création de l'acheteur simulé
-        temp_buyer = {
+        # Création du nouvel acheteur simulé
+        simulated_buyer = {
             "name": new_buyer_name,
             "products": {
                 prod_id: {
                     "qty_desired": remaining_stock,
-                    "current_price": max_competitor_price,  # démarrage au prix max concurrent
-                    "max_price": max_competitor_price + 1000,  # très haut pour ne pas bloquer
+                    "current_price": test_price,
+                    "max_price": 1e6,  # pas de limite pour simulation
                     "moq": product["seller_moq"]
                 }
             },
-            "auto_bid": False
+            "auto_bid": True
         }
 
-        # Incrément progressif pour atteindre 100% allocation
-        test_price = temp_buyer["products"][prod_id]["current_price"]
-
+        # Boucle d'incrémentation progressive
         while True:
-            # Résolution du solveur avec l'acheteur temporaire
-            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-            allocated = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+            simulated_buyer["products"][prod_id]["current_price"] = round(test_price, 2)
+            allocs, _ = solve_model(buyers_copy + [simulated_buyer], products)
+            alloc_qty = allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
-            if allocated >= remaining_stock:
-                # Stock sécurisé
-                recommended_price = test_price
+            if alloc_qty >= remaining_stock:
+                # Stock sécurisé, on peut arrêter
+                recommended_price = round(test_price, 2)
                 break
 
-            # Step identique à auto-bid
+            # Incrément progressif comme auto-bid
             step = max(min_step, test_price * pct_step)
             test_price += step
-            temp_buyer["products"][prod_id]["current_price"] = test_price
+
+            # Sécurité pour éviter boucle infinie
+            if test_price > simulated_buyer["products"][prod_id]["current_price"] + 100:
+                recommended_price = round(test_price, 2)
+                break
 
         recommendations[prod_id] = {
-            "recommended_price": round(recommended_price, 2),
+            "recommended_price": recommended_price,
             "recommended_qty": remaining_stock,
             "remaining_stock": remaining_stock
         }
