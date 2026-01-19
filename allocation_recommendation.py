@@ -47,33 +47,39 @@ def calculate_optimal_bid(
         test_price = max_competitor_price
         recommended_price = test_price
 
-        # Incrémenter avec le même step que l'auto-bid
-        while test_price < test_price + 100:  # limite haute arbitraire
-            step = max(min_step, test_price * pct_step)
-            next_price = round(test_price + step, 2)
+        # 0️⃣ Tester d'abord le prix de départ
+        temp_buyer = {
+            "name": new_buyer_name,
+            "products": {
+                prod_id: {
+                    "qty_desired": remaining_stock,
+                    "current_price": test_price,
+                    "max_price": test_price,
+                    "moq": product["seller_moq"]
+                }
+            },
+            "auto_bid": False
+        }
+        allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+        alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+        if alloc >= remaining_stock:
+            # Le prix initial suffit
+            recommended_price = test_price
+        else:
+            # 🔹 Sinon, incrément progressif
+            while test_price < test_price + 100:  # limite haute arbitraire
+                step = max(min_step, test_price * pct_step)
+                next_price = round(test_price + step, 2)
 
-            # Buyer temporaire
-            temp_buyer = {
-                "name": new_buyer_name,
-                "products": {
-                    prod_id: {
-                        "qty_desired": remaining_stock,
-                        "current_price": next_price,
-                        "max_price": next_price,
-                        "moq": product["seller_moq"]
-                    }
-                },
-                "auto_bid": False
-            }
+                temp_buyer["products"][prod_id]["current_price"] = next_price
+                allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+                alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
-            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+                if alloc >= remaining_stock:
+                    recommended_price = next_price
+                    break
 
-            if alloc >= remaining_stock:
-                recommended_price = next_price
-                break
-
-            test_price = next_price
+                test_price = next_price
 
         recommendations[prod_id] = {
             "recommended_price": recommended_price,
