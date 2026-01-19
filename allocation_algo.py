@@ -1,4 +1,4 @@
-    import pulp
+import pulp
 import copy
 from typing import Dict, List, Tuple
 
@@ -133,42 +133,18 @@ def run_auto_bid_aggressive(
 
                 best_price = current_price
 
-                min_step = 0.1
-                pct_step = 0.05
-                
-                while True:
-                    # calcul incrément
-                    step = max(min_step, current_price * pct_step)
-                
-                    if qty_desired > 0:
-                        gap_ratio = 1 - (current_alloc / qty_desired)
-                        step *= (1 + gap_ratio)
-                
-                    # prix candidat
-                    test_price = min(current_price + step, max_price)
-                
-                    # si incrément trop petit pour changer allocation, tester max_price
-                    if test_price <= current_price and current_price < max_price:
-                        test_price = max_price
-                
+                for inc in [0.5, 1.0 , 2.0 , 3.0 , 5.0 , 10.0]:
+                    test_price = min(current_price + inc, max_price)
                     if test_price <= current_price:
-                        break  # plus rien à faire
-                
+                        continue
+
                     prod_conf["current_price"] = test_price
                     new_allocs, _ = solve_model(current_buyers, products)
-                
+
                     if new_allocs[buyer_name][prod_id] > current_alloc:
                         best_price = test_price
                         current_alloc = new_allocs[buyer_name][prod_id]
                         changes_made = True
-                        current_price = test_price  # update pour le next step
-                    else:
-                        # si même max_price ne donne pas plus → stop
-                        if test_price == max_price:
-                            break
-                        # sinon on continue avec l'incrément suivant
-                        current_price = test_price
-
 
                 prod_conf["current_price"] = min(best_price, max_price)
 
