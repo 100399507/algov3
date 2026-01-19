@@ -59,6 +59,7 @@ with st.sidebar.form("add_buyer_form"):
         qty = st.number_input(
             f"Qté désirée – {p['id']}",
             min_value=min_qty,
+            max_value=p["stock"],
             value=min_qty,
             step=multiple,
             key=f"qty_{p['id']}_{idx_p}"
