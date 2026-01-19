@@ -158,7 +158,6 @@ if simulate_submit and buyer_name:
     st.session_state.buyers,
     products,
     new_buyer_name=buyer_name,
-    starting_prices=draft_products  # <-- ici
     )
 
     rec_rows = []
