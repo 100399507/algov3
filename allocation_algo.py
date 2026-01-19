@@ -132,8 +132,7 @@ def run_auto_bid_aggressive(
                     continue
 
                 best_price = current_price
-
-           # -----------------------------
+# -----------------------------
 # Parcours des acheteurs par prix max décroissant
 # -----------------------------
 # Trier les acheteurs selon le prix max le plus élevé parmi leurs produits
