@@ -49,20 +49,22 @@ with st.sidebar.form("add_buyer_form"):
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
     draft_products = {}
-    for p in products:
+    for idx_p, p in enumerate(products):
         st.markdown(f"**{p['name']} ({p['id']})**")
 
         multiple = p["volume_multiple"]
         min_qty = max(p["seller_moq"], multiple)
 
+        # Quantité désirée
         qty = st.number_input(
             f"Qté désirée – {p['id']}",
             min_value=min_qty,
             value=min_qty,
-            step=multiple
+            step=multiple,
+            key=f"qty_{p['id']}_{idx_p}"  # clé unique
         )
 
-        # Déterminer le prix courant minimal pour ce produit
+        # Prix courant minimal pour ce produit
         current_price_min = p["starting_price"]
         if st.session_state.buyers:
             allocated_prices = [
@@ -73,19 +75,22 @@ with st.sidebar.form("add_buyer_form"):
             if allocated_prices:
                 current_price_min = min(allocated_prices)
 
+        # Prix courant
         price = st.number_input(
             f"Prix courant – {p['id']}",
             min_value=current_price_min,
             value=current_price_min,
-            step=0.5
+            step=0.5,
+            key=f"price_{p['id']}_{idx_p}"  # clé unique
         )
 
+        # Prix max
         max_price = st.number_input(
             f"Prix max – {p['id']}",
             min_value=price,
             value=price,
             step=0.5,
-            key=f"max_{p['id']}"
+            key=f"max_{p['id']}_{idx_p}"  # clé unique
         )
 
         draft_products[p["id"]] = {
