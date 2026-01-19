@@ -153,8 +153,7 @@ def run_auto_bid_aggressive(buyers, products, max_rounds=30):
                     step = max(min_step, test_price * pct_step)
                     next_price = min(test_price + step, max_price)
 
-                    # Arrondi au centième
-                    next_price = round(next_price, 2)
+                    
 
                     prod_conf["current_price"] = next_price
                     new_allocs, _ = solve_model(current_buyers, products)
@@ -166,6 +165,8 @@ def run_auto_bid_aggressive(buyers, products, max_rounds=30):
                         changes_made = True
                         break
                     test_price = next_price
+                    # Arrondi au centième
+                    test_price = round(test_price, 2)
                     changes_made = True
 
                 prod_conf["current_price"] = test_price
