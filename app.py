@@ -170,19 +170,6 @@ if simulate_submit and buyer_name:
     st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
 
 
-    # Affichage clair
-    sim_rows = []
-    for pid, prod in draft_products.items():
-        sim_rows.append({
-            "Produit": pid,
-            "Prix courant simulé (€)": buyers_sim[-1]["products"][pid]["current_price"],
-            "Prix max simulé (€)": buyers_sim[-1]["products"][pid]["max_price"],
-            "Quantité simulée": sim_alloc.get(pid, 0)
-        })
-
-    st.subheader(f"🧪 Simulation pour {buyer_name}")
-    st.dataframe(pd.DataFrame(sim_rows), use_container_width=True)
-
 # -----------------------------
 # Produits en vente
 # -----------------------------
