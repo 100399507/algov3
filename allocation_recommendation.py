@@ -32,8 +32,8 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
         )
 
         # Quantité réellement souhaitée par l’acheteur simulé
-        qty_desired = product["qty_desired"]
-
+        qty_desired = remaining_stock
+        
         # 👉 ON TESTE D’ABORD SANS INCRÉMENT
         temp_buyer = {
             "name": new_buyer_name,
