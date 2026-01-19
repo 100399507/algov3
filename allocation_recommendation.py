@@ -1,13 +1,13 @@
 import copy
 from allocation_algo import solve_model
 
-def calculate_optimal_bid(buyers, products, user_qtys, user_prices, new_buyer_name="Nouvel Acheteur"):
+def simulate_optimal_bid(buyers, products, user_qtys, user_prices, new_buyer_name="__SIMULATION__", max_rounds=30):
     """
-    Calcule pour un nouvel acheteur le prix minimal à proposer pour obtenir
-    la quantité souhaitée par l'utilisateur si elle dépasse le stock restant,
-    sinon aucune incrémentation automatique n'est faite.
+    Simule le prix minimal à proposer pour obtenir la quantité souhaitée,
+    en reproduisant exactement la logique de run_auto_bid_aggressive
+    sur une copie des acheteurs existants.
     
-    user_qtys : dict {prod_id: qty_saisie_par_utilisateur}
+    Retourne le prix recommandé pour chaque produit saisi par l'utilisateur.
     """
     buyers_copy = copy.deepcopy(buyers)
     recommendations = {}
@@ -15,66 +15,75 @@ def calculate_optimal_bid(buyers, products, user_qtys, user_prices, new_buyer_na
     min_step = 0.1
     pct_step = 0.05
 
-    for product in products:
-        prod_id = product["id"]
-        stock_available = product["stock"]
+    # On crée un buyer temporaire avec les quantités saisies
+    temp_buyer = {
+        "name": new_buyer_name,
+        "auto_bid": True,
+        "products": {}
+    }
+    for pid, qty in user_qtys.items():
+        temp_buyer["products"][pid] = {
+            "qty_desired": qty,
+            "current_price": user_prices.get(pid, 0),
+            "max_price": 1e6,  # valeur très grande pour simuler le "tout prix"
+            "moq": next(p["seller_moq"] for p in products if p["id"] == pid)
+        }
 
-        qty_desired = user_qtys.get(prod_id, 0)
-        price_desired = user_prices.get(prod_id,0)
+    buyers_copy.append(temp_buyer)
 
-        # Allocation actuelle
-        allocations, _ = solve_model(buyers_copy, products)
-        total_allocated = sum(allocations[b["name"]][prod_id] for b in buyers_copy)
-        remaining_stock = max(stock_available - total_allocated, 0)
+    # On applique l'auto-bid sur la copie
+    for _ in range(max_rounds):
+        changes_made = False
 
-        # Si la quantité saisie est ≤ stock restant, on ne fait pas d'incrémentation
-        if qty_desired <= remaining_stock:
-            recommendations[prod_id] = {
-                "recommended_price": price_desired,  # on renvoie le current price
-                "recommended_qty": qty_desired,
-                "remaining_stock": remaining_stock
-            }
-            continue
-
-        # Sinon, la quantité souhaitée dépasse le stock restant → on calcule le prix à mettre
-        max_competitor_price = max(
-            (b["products"][prod_id]["max_price"] for b in buyers_copy), default=0
+        # Trier les buyers par prix max descendant pour reproduire l'ordre de l'auto-bid
+        buyers_sorted = sorted(
+            buyers_copy,
+            key=lambda b: max(p["max_price"] for p in b["products"].values()),
+            reverse=True
         )
 
-        test_price = max_competitor_price
+        for buyer in buyers_sorted:
+            if not buyer.get("auto_bid", False):
+                continue
 
-        while test_price < max_competitor_price + 1000:  # limite arbitraire
-            step = max(min_step, test_price * pct_step)
-            next_price = test_price + step
+            for pid, prod_conf in buyer["products"].items():
+                current_price = prod_conf["current_price"]
+                max_price = prod_conf["max_price"]
+                qty_desired = prod_conf["qty_desired"]
 
-            temp_buyer = {
-                "name": new_buyer_name,
-                "products": {
-                    prod_id: {
-                        "qty_desired": qty_desired,
-                        "current_price": next_price,
-                        "max_price": next_price,
-                        "moq": product["seller_moq"]
-                    }
-                },
-                "auto_bid": False
-            }
+                allocations, _ = solve_model(buyers_copy, products)
+                current_alloc = allocations[buyer["name"]].get(pid, 0)
 
-            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
+                if current_alloc >= qty_desired:
+                    continue  # déjà atteint
 
-            if alloc >= qty_desired:
-                recommended_price = next_price
-                break
+                # Incrément progressif identique à l'auto-bid
+                test_price = current_price
+                while test_price < max_price:
+                    step = max(min_step, test_price * pct_step)
+                    next_price = min(test_price + step, max_price)
+                    prod_conf["current_price"] = next_price
 
-            test_price = next_price
-        else:
-            recommended_price = max_competitor_price + 1000
+                    new_allocs, _ = solve_model(buyers_copy, products)
+                    new_alloc = new_allocs[buyer["name"]].get(pid, 0)
 
-        recommendations[prod_id] = {
-            "recommended_price": round(recommended_price, 2),
-            "recommended_qty": qty_desired,
-            "remaining_stock": remaining_stock
+                    if new_alloc >= qty_desired:
+                        test_price = next_price
+                        changes_made = True
+                        break
+                    test_price = next_price
+                    changes_made = True
+
+                prod_conf["current_price"] = round(test_price, 2)
+
+        if not changes_made:
+            break
+
+    # Après simulation, on récupère les prix simulés pour le buyer temporaire
+    for pid in user_qtys:
+        recommendations[pid] = {
+            "recommended_price": temp_buyer["products"][pid]["current_price"],
+            "recommended_qty": temp_buyer["products"][pid]["qty_desired"]
         }
 
     return recommendations
