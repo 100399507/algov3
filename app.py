@@ -292,41 +292,33 @@ if st.session_state.history:
         st.dataframe(pd.DataFrame(alloc_rows))
         st.metric("💰 CA total", f"{h['total_ca']:.2f} €")
 
+
+# Recommandations pour chaque acheteur
 # -----------------------------
-# Recommandations pour nouvel acheteur simplifiées
-# -----------------------------
-st.subheader("💡 Recommandation de prix pour un nouvel acheteur")
+st.subheader("💡 Prix max recommandé pour chaque acheteur (obtenir 100% du stock)")
 if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
         st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
     else:
-        # On crée un buyer temporaire "__SIMULATION__" à partir des valeurs max de chaque produit
-        user_qtys = {}
-        user_prices = {}
-        for p in products:
-            pid = p["id"]
-            # Quantité maximale possible = stock restant
-            user_qtys[pid] = p["stock"]
-            # Prix courant min = prix courant le plus bas parmi les acheteurs avec allocation sur ce produit
-            allocated_prices = [
-                b["products"][pid]["current_price"]
-                for b in st.session_state.buyers
-                if pid in b["products"] and b.get("allocated", {}).get(pid, 0) > 0
-            ]
-            user_prices[pid] = max(allocated_prices) if allocated_prices else p["starting_price"]
+        all_recs = []
 
-        recs = simulate_optimal_bid(
-            st.session_state.buyers,
-            products,
-            user_qtys=user_qtys,
-            user_prices=user_prices,
-            new_buyer_name="__SIMULATION__"
-        )
+        for buyer in st.session_state.buyers:
+            user_qtys = {pid: p["qty_desired"] for pid, p in buyer["products"].items()}
+            user_prices = {pid: p["current_price"] for pid, p in buyer["products"].items()}
 
-        rec_rows = []
-        for pid, rec in recs.items():
-            rec_rows.append({
-                "Produit": pid,
-                "Prix recommandé (€)": rec["recommended_price"]
-            })
-        st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
+            recs = simulate_optimal_bid(
+                st.session_state.buyers,
+                products,
+                user_qtys=user_qtys,
+                user_prices=user_prices,
+                new_buyer_name=buyer["name"] + "_SIMULATION"
+            )
+
+            for pid, rec in recs.items():
+                all_recs.append({
+                    "Acheteur": buyer["name"],
+                    "Produit": pid,
+                    "Prix max recommandé (€)": rec["recommended_price"]
+                })
+
+        st.dataframe(pd.DataFrame(all_recs), use_container_width=True)
