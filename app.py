@@ -88,15 +88,10 @@ with st.sidebar.form("add_buyer_form"):
             current_price_min = p["starting_price"]
     
         # Affichage prix courant pour info mais non modifiable
-        price = st.number_input(
-            f"Prix minimum d'enchère – {p['id']}",
-            min_value=current_price_min,
-            value=current_price_min,
-            step=0.5,
-            key=f"price_{p['id']}_{idx_p}",
-            disabled=True  # 🔹 affiché mais pas modifiable
-        )
 
+        st.metric(f"Prix courant minimum – {p['id']}", f"{current_price_min:.2f} €")
+
+  
         # Prix max
         max_price = st.number_input(
             f"Prix max – {p['id']}",
