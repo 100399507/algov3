@@ -190,7 +190,7 @@ def run_auto_bid_aggressive(
                     prod_conf["current_price"] = test_price
             
             
-                            prod_conf["current_price"] = min(best_price, max_price)
+                    prod_conf["current_price"] = min(best_price, max_price)
 
         if not changes_made:
             break
