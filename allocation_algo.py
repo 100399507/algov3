@@ -165,11 +165,9 @@ def run_auto_bid_aggressive(buyers, products, max_rounds=30):
                         changes_made = True
                         break
                     test_price = next_price
-                    # Arrondi au centième
-                    test_price = round(test_price, 2)
                     changes_made = True
 
-                prod_conf["current_price"] = test_price
+                prod_conf["current_price"] = round(test_price,2)
 
         if not changes_made:
             break
