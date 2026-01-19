@@ -7,7 +7,6 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
     100% du stock disponible, en tenant compte des prix max des autres acheteurs
     et en appliquant la même logique d'incrémentation que l'auto-bid.
     """
-
     buyers_copy = copy.deepcopy(buyers)
     recommendations = {}
 
@@ -19,11 +18,10 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
         prod_id = product["id"]
         stock_available = product["stock"]
 
-        # Quantité totale déjà allouée aux autres acheteurs
+        # Quantité totale que le nouvel acheteur souhaite (tout le stock restant)
         allocations, _ = solve_model(buyers_copy, products)
         total_allocated = sum(allocations[b["name"]][prod_id] for b in buyers_copy)
         remaining_stock = max(stock_available - total_allocated, 0)
-
         if remaining_stock <= 0:
             recommendations[prod_id] = {
                 "recommended_price": None,
@@ -32,30 +30,22 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
             }
             continue
 
-        # Prix max parmi tous les autres acheteurs
+        # Prix max parmi tous les autres acheteurs pour ce produit
         max_competitor_price = 0
         for b in buyers_copy:
             max_price = b["products"][prod_id]["max_price"]
             if max_price > max_competitor_price:
                 max_competitor_price = max_price
 
-        # Si la quantité souhaitée est inférieure ou égale au stock disponible, 
-        # on peut sécuriser le stock au prix minimal juste au-dessus du max concurrent
-        if remaining_stock <= stock_available:
-            recommended_price = max_competitor_price
-            recommendations[prod_id] = {
-                "recommended_price": round(recommended_price, 2),
-                "recommended_qty": remaining_stock,
-                "remaining_stock": remaining_stock
-            }
-            continue
-
-        # Sinon, on fait l'incrémentation classique comme avant
+        # On commence juste au-dessus du max competitor
         test_price = max_competitor_price
+
         while test_price < max_competitor_price + 1000:  # limite arbitraire
+            # Incrément progressif
             step = max(min_step, test_price * pct_step)
             next_price = test_price + step
 
+            # On crée le buyer temporaire avec ce prix
             temp_buyer = {
                 "name": new_buyer_name,
                 "products": {
@@ -69,15 +59,18 @@ def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
                 "auto_bid": False
             }
 
+            # Tester allocation
             allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
             alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
             if alloc >= remaining_stock:
+                # Stock sécurisé : on peut s'arrêter
                 recommended_price = next_price
                 break
 
             test_price = next_price
         else:
+            # Si jamais on n'atteint pas le stock (limite arbitr.), on met max
             recommended_price = max_competitor_price + 1000
 
         recommendations[prod_id] = {
