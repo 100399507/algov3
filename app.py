@@ -34,7 +34,7 @@ def buyers_to_df(buyers):
                 "Qté désirée": p["qty_desired"],
                 "MOQ produit": p["moq"],
                 "Prix courant": p["current_price"],
-                "Prix max": p["max_price"],  # Toujours valeur saisie
+                "Prix max": p["max_price"],
                 "Auto-bid": b.get("auto_bid", False)
             })
     return pd.DataFrame(rows)
@@ -61,10 +61,10 @@ with st.sidebar.form("add_buyer_form"):
             min_value=min_qty,
             value=min_qty,
             step=multiple,
-            key=f"qty_{p['id']}_{idx_p}"  # clé unique
+            key=f"qty_{p['id']}_{idx_p}"
         )
 
-        # Prix courant minimal pour ce produit
+        # Prix courant minimal
         current_price_min = p["starting_price"]
         if st.session_state.buyers:
             allocated_prices = [
@@ -81,7 +81,7 @@ with st.sidebar.form("add_buyer_form"):
             min_value=current_price_min,
             value=current_price_min,
             step=0.5,
-            key=f"price_{p['id']}_{idx_p}"  # clé unique
+            key=f"price_{p['id']}_{idx_p}"
         )
 
         # Prix max
@@ -90,7 +90,7 @@ with st.sidebar.form("add_buyer_form"):
             min_value=price,
             value=price,
             step=0.5,
-            key=f"max_{p['id']}_{idx_p}"  # clé unique
+            key=f"max_{p['id']}_{idx_p}"
         )
 
         draft_products[p["id"]] = {
@@ -115,25 +115,25 @@ if add_submit and buyer_name:
     st.success(f"Acheteur {buyer_name} ajouté")
 
 if simulate_submit and buyer_name:
-    # 1️⃣ Créer une copie isolée des acheteurs existants
+    # Copie isolée pour simulation
     buyers_sim = copy.deepcopy(st.session_state.buyers)
 
-    # 2️⃣ Ajouter l'acheteur simulé
+    # Ajouter l'acheteur simulé
     simulated_buyer = {
         "name": "__SIMULATION__",
         "products": copy.deepcopy(draft_products),
-        "auto_bid": True  # Auto-bid activé pour le simulateur seulement
+        "auto_bid": True
     }
     buyers_sim.append(simulated_buyer)
 
-    # 3️⃣ Lancer l'auto-bid sur la copie uniquement
+    # Lancer auto-bid uniquement sur la copie
     buyers_sim = run_auto_bid_aggressive(buyers_sim, products, max_rounds=5)
 
-    # 4️⃣ Récupérer l'allocation du simulateur
+    # Allocation finale du simulateur
     allocations, _ = solve_model(buyers_sim, products)
     sim_alloc = allocations.get("__SIMULATION__", {})
 
-    # 5️⃣ Affichage clair
+    # Affichage clair
     sim_rows = []
     for pid, prod in draft_products.items():
         sim_rows.append({
@@ -146,40 +146,10 @@ if simulate_submit and buyer_name:
     st.subheader(f"🧪 Simulation pour {buyer_name}")
     st.dataframe(pd.DataFrame(sim_rows), use_container_width=True)
 
-
-
-# -----------------------------
-# Actions formulaire
-# -----------------------------
-if add_submit and buyer_name:
-    st.session_state.buyers.append({
-        "name": buyer_name,
-        "products": copy.deepcopy(draft_products),
-        "auto_bid": auto_bid
-    })
-    st.success(f"Acheteur {buyer_name} ajouté")
-
-if simulate_submit:
-    buyers_sim = copy.deepcopy(st.session_state.buyers)
-
-    simulated_buyer = {
-        "name": "__SIMULATION__",
-        "products": draft_products,
-        "auto_bid": False
-    }
-
-    buyers_sim.append(simulated_buyer)
-
-    allocations, _ = solve_model(buyers_sim, products)
-
-    st.session_state.simulation_result = allocations.get("__SIMULATION__", {})
-
-
 # -----------------------------
 # Produits en vente
 # -----------------------------
 st.subheader("📦 Produits en vente")
-
 product_rows = []
 for p in products:
     product_rows.append({
@@ -189,11 +159,7 @@ for p in products:
         "Prix de départ (€)": p["starting_price"],
         "MOQ vendeur": p["seller_moq"]
     })
-
-st.dataframe(
-    pd.DataFrame(product_rows),
-    use_container_width=True
-)
+st.dataframe(pd.DataFrame(product_rows), use_container_width=True)
 
 # -----------------------------
 # Affichage acheteurs
@@ -204,46 +170,50 @@ if st.session_state.buyers:
 else:
     st.info("Aucun acheteur pour le moment.")
 
-
 # -----------------------------
-# Modifier le prix max des acheteurs (version compacte)
+# Modifier le prix max des acheteurs (clé unique)
 # -----------------------------
 st.subheader("✏️ Modifier les prix max des acheteurs")
-
 if st.session_state.buyers:
-    for idx, buyer in enumerate(st.session_state.buyers):
+    for idx_b, buyer in enumerate(st.session_state.buyers):
         st.markdown(f"**{buyer['name']}**")
-        cols = st.columns(len(products))  # Une colonne par produit
-        for col, (pid, prod) in zip(cols, buyer["products"].items()):
+        cols = st.columns(len(products))
+        for idx_p, (col, (pid, prod)) in enumerate(zip(cols, buyer["products"].items())):
+            widget_key = f"max_{buyer['name']}_{pid}_{idx_b}_{idx_p}"
             new_max = col.number_input(
                 f"{pid}",
                 min_value=prod["current_price"],
                 value=prod["max_price"],
-                key=f"max_{buyer['name']}_{pid}"
+                step=0.5,
+                key=widget_key
             )
-            # Mise à jour dans session_state
-            st.session_state.buyers[idx]["products"][pid]["max_price"] = new_max
-            if st.session_state.buyers[idx]["products"][pid]["current_price"] > new_max:
-                st.session_state.buyers[idx]["products"][pid]["current_price"] = new_max
-
+            st.session_state.buyers[idx_b]["products"][pid]["max_price"] = new_max
+            if st.session_state.buyers[idx_b]["products"][pid]["current_price"] > new_max:
+                st.session_state.buyers[idx_b]["products"][pid]["current_price"] = new_max
 
 # -----------------------------
-# Lancer simulation
+# Lancer simulation auto-bid
 # -----------------------------
 st.subheader("⚙️ Simulation auto-bid")
 if st.button("▶️ Lancer simulation avec auto-bid"):
     buyers_copy = copy.deepcopy(st.session_state.buyers)
     history = []
-
     max_rounds = 30
+
     for iteration in range(max_rounds):
         allocations, total_ca = solve_model(buyers_copy, products)
         history.append({
-            "itération": iteration+1,
+            "itération": iteration + 1,
             "allocations": copy.deepcopy(allocations),
             "total_ca": total_ca,
-            "current_prices": {b["name"]: {pid: b["products"][pid]["current_price"] for pid in b["products"]} for b in buyers_copy},
-            "max_prices": {b["name"]: {pid: b["products"][pid]["max_price"] for pid in b["products"]} for b in buyers_copy}
+            "current_prices": {
+                b["name"]: {pid: b["products"][pid]["current_price"] for pid in b["products"]}
+                for b in buyers_copy
+            },
+            "max_prices": {
+                b["name"]: {pid: b["products"][pid]["max_price"] for pid in b["products"]}
+                for b in buyers_copy
+            }
         })
         buyers_copy_new = run_auto_bid_aggressive(buyers_copy, products, max_rounds=1)
         if buyers_copy_new == buyers_copy:
@@ -279,19 +249,15 @@ if st.session_state.history:
 # Recommandations pour nouvel acheteur simplifiées
 # -----------------------------
 st.subheader("💡 Recommandation de prix pour un nouvel acheteur")
-
 if st.button("📊 Calculer recommandations"):
     if not st.session_state.buyers:
         st.info("Ajoute d'abord des acheteurs existants pour calculer les recommandations.")
     else:
-        # Calculer recommandations
         recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name="Nouvel Acheteur")
-        
         rec_rows = []
         for pid, rec in recs.items():
             rec_rows.append({
                 "Produit": pid,
                 "Prix recommandé (€)": rec["recommended_price"]
             })
-        
         st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
