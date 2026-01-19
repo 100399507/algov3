@@ -133,6 +133,38 @@ if simulate_submit and buyer_name:
     allocations, _ = solve_model(buyers_sim, products)
     sim_alloc = allocations.get("__SIMULATION__", {})
 
+    # Calcul du % alloué et affichage
+    sim_rows = []
+    for pid, prod in draft_products.items():
+        qty_desired = prod["qty_desired"]
+        qty_allocated = sim_alloc.get(pid, 0)
+        pct_alloc = (qty_allocated / qty_desired) * 100 if qty_desired > 0 else 0
+
+        sim_rows.append({
+            "Produit": pid,
+            "Prix courant simulé (€)": buyers_sim[-1]["products"][pid]["current_price"],
+            "Prix max simulé (€)": buyers_sim[-1]["products"][pid]["max_price"],
+            "Quantité simulée": qty_allocated,
+            "% alloué": f"{pct_alloc:.1f} %"
+        })
+
+    st.subheader(f"🧪 Simulation pour {buyer_name}")
+    st.dataframe(pd.DataFrame(sim_rows), use_container_width=True)
+
+    # -----------------------------
+    # Recommandation automatique pour sécuriser 100%
+    # -----------------------------
+    recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name=buyer_name)
+    rec_rows = []
+    for pid, rec in recs.items():
+        rec_rows.append({
+            "Produit": pid,
+            "Prix recommandé pour 100% allocation (€)": rec["recommended_price"]
+        })
+    st.subheader(f"💡 Recommandation pour {buyer_name} (obtenir 100% du stock)")
+    st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
+
+
     # Affichage clair
     sim_rows = []
     for pid, prod in draft_products.items():
