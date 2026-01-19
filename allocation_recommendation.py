@@ -3,25 +3,12 @@ import math
 from allocation_algo import solve_model
 
 
-def calculate_optimal_bid(
-    buyers,
-    products,
-    new_buyer_name="Nouvel Acheteur",
-    simulated_qty_by_product=None,
-):
+def calculate_optimal_bid(buyers, products, new_buyer_name="Nouvel Acheteur"):
     buyers_copy = copy.deepcopy(buyers)
     recommendations = {}
 
     min_step = 0.1
     pct_step = 0.05
-
-    # Sécurité si non fourni
-    simulated_qty_by_product = simulated_qty_by_product or {}
-
-    # Lookup du nouvel acheteur s'il existe déjà
-    buyer_lookup = {
-        b["name"]: b for b in buyers_copy
-    }
 
     for product in products:
         prod_id = product["id"]
@@ -29,18 +16,13 @@ def calculate_optimal_bid(
         moq = product.get("seller_moq", 1)
 
         # -----------------------------
-        # 1. Quantité désirée réelle
+        # 1. Quantité désirée (FRONT)
         # -----------------------------
-        if prod_id in simulated_qty_by_product:
-            qty_desired = simulated_qty_by_product[prod_id]
-        else:
-            qty_desired = (
-                buyer_lookup
-                .get(new_buyer_name, {})
-                .get("products", {})
-                .get(prod_id, {})
-                .get("qty_desired", 0)
-            )
+        qty_desired = 0
+        for b in buyers_copy:
+            if b["name"] == new_buyer_name and prod_id in b["products"]:
+                qty_desired = b["products"][prod_id]["qty_desired"]
+                break
 
         if qty_desired <= 0:
             continue
@@ -98,7 +80,7 @@ def calculate_optimal_bid(
             return allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
         # -----------------------------
-        # 5. Test SANS incrément
+        # 5. Test sans incrément
         # -----------------------------
         if simulate(max_competitor_price) >= target_qty:
             recommendations[prod_id] = {
@@ -116,23 +98,16 @@ def calculate_optimal_bid(
         test_price = max_competitor_price + step
         test_price = math.ceil(test_price / step) * step
 
-        recommended_price = None
-
         while test_price < max_competitor_price + 1000:
             if simulate(test_price) >= target_qty:
-                recommended_price = test_price
+                recommendations[prod_id] = {
+                    "recommended_price": round(test_price, 2),
+                    "recommended_qty": target_qty,
+                    "remaining_stock": remaining_stock
+                }
                 break
 
             test_price += step
             test_price = math.ceil(test_price / step) * step
-
-        if recommended_price is None:
-            recommended_price = max_competitor_price + 1000
-
-        recommendations[prod_id] = {
-            "recommended_price": round(recommended_price, 2),
-            "recommended_qty": target_qty,
-            "remaining_stock": remaining_stock
-        }
 
     return recommendations
