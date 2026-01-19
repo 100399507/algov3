@@ -5,17 +5,18 @@ from allocation_algo import solve_model
 def calculate_optimal_bid(
     buyers: List[Dict],
     products: List[Dict],
-    new_buyer_name: str = "Nouvel Acheteur",
-    min_step: float = 0.1,
-    pct_step: float = 0.05,
+    new_buyer_name: str = "Nouvel Acheteur"
 ) -> Dict[str, Dict]:
     """
     Calcule pour un nouvel acheteur le prix et la quantité à proposer
-    pour obtenir 100% du stock disponible, en simulant l'auto-bid
-    sur ce nouvel acheteur uniquement.
+    pour obtenir 100% du stock disponible, en appliquant la même
+    logique que l'auto-bid (incrément progressif).
     """
     buyers_copy = copy.deepcopy(buyers)
     recommendations = {}
+
+    min_step = 0.1
+    pct_step = 0.05  # même step que l'auto-bid
 
     for product in products:
         prod_id = product["id"]
@@ -26,54 +27,42 @@ def calculate_optimal_bid(
         total_allocated = sum(allocations[b["name"]][prod_id] for b in buyers_copy)
         remaining_stock = max(stock_available - total_allocated, 0)
 
-        # Si pas de stock restant, rien à recommander
-        if remaining_stock <= 0:
-            recommendations[prod_id] = {
-                "recommended_price": 0,
-                "recommended_qty": 0,
-                "remaining_stock": 0
-            }
-            continue
+        # Commencer au prix de départ (starting_price ou min_price que tu veux tester)
+        test_price = product.get("starting_price", 0)
 
-        # Prix de départ : current_price minimal que peut proposer le nouvel acheteur
-        competitor_prices = [
-            b["products"][prod_id]["current_price"]
-            for b in buyers_copy if prod_id in b["products"]
-        ]
-        start_price = max(competitor_prices + [product["starting_price"]])
-
-        # Création du buyer simulé
+        # Créer un buyer temporaire avec ce prix
         temp_buyer = {
             "name": new_buyer_name,
             "products": {
                 prod_id: {
                     "qty_desired": remaining_stock,
-                    "current_price": start_price,
-                    "max_price": start_price,  # on incrémente nous-mêmes
+                    "current_price": test_price,
+                    "max_price": test_price + 100,  # limite arbitraire haute
                     "moq": product["seller_moq"]
                 }
             },
             "auto_bid": False
         }
 
-        test_price = start_price
-        final_price = test_price
-
-        # Incrément progressif jusqu'à obtenir 100% du stock
-        while test_price <= 1000:  # limite arbitraire
+        # Incrément progressif jusqu'à obtenir 100% du stock restant
+        while test_price <= temp_buyer["products"][prod_id]["max_price"]:
             temp_buyer["products"][prod_id]["current_price"] = test_price
-            sim_allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
-            allocated_qty = sim_allocs.get(new_buyer_name, {}).get(prod_id, 0)
+            allocs, _ = solve_model(buyers_copy + [temp_buyer], products)
+            alloc = allocs.get(new_buyer_name, {}).get(prod_id, 0)
 
-            if allocated_qty >= remaining_stock:
-                final_price = test_price
+            if alloc >= remaining_stock:
+                # Stock sécurisé, on peut s'arrêter
                 break
 
+            # incrément suivant
             step = max(min_step, test_price * pct_step)
             test_price += step
 
+        # Arrondir au centième
+        recommended_price = round(test_price, 2)
+
         recommendations[prod_id] = {
-            "recommended_price": round(final_price, 2),
+            "recommended_price": recommended_price,
             "recommended_qty": remaining_stock,
             "remaining_stock": remaining_stock
         }
