@@ -132,21 +132,19 @@ def run_auto_bid_aggressive(
                     continue
 
                 best_price = current_price
-### Code en commentaire avec incrémentation fixe 
-                
-               for inc in [0.5, 1.0 , 2.0 , 3.0 , 5.0 , 10.0]:
-                   test_price = min(current_price + inc, max_price)
-                   if test_price <= current_price:
+
+                for inc in [0.5, 1.0 , 2.0 , 3.0 , 5.0 , 10.0]:
+                    test_price = min(current_price + inc, max_price)
+                    if test_price <= current_price:
                         continue
 
                     prod_conf["current_price"] = test_price
                     new_allocs, _ = solve_model(current_buyers, products)
 
-                  if new_allocs[buyer_name][prod_id] > current_alloc:
+                    if new_allocs[buyer_name][prod_id] > current_alloc:
                         best_price = test_price
                         current_alloc = new_allocs[buyer_name][prod_id]
-                       changes_made = True
-## Fin du code en commentaire
+                        changes_made = True
 
                 prod_conf["current_price"] = min(best_price, max_price)
 
