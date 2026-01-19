@@ -75,14 +75,26 @@ with st.sidebar.form("add_buyer_form"):
             ]
             if allocated_prices:
                 current_price_min = min(allocated_prices)
-
-        # Prix courant
+    
+        # Calcul du prix courant minimum parmi les acheteurs ayant du stock alloué
+        allocated_prices = [
+            b["products"][p["id"]]["current_price"]
+            for b in st.session_state.buyers
+            if p["id"] in b["products"] and b.get("allocated", {}).get(p["id"], 0) > 0
+        ]
+        if allocated_prices:
+            current_price_min = max(allocated_prices)  # prix courant minimum pour démarrer
+        else:
+            current_price_min = p["starting_price"]
+    
+        # Affichage prix courant pour info mais non modifiable
         price = st.number_input(
             f"Prix courant – {p['id']}",
             min_value=current_price_min,
             value=current_price_min,
             step=0.5,
-            key=f"price_{p['id']}_{idx_p}"
+            key=f"price_{p['id']}_{idx_p}",
+            disabled=True  # 🔹 affiché mais pas modifiable
         )
 
         # Prix max
