@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import copy
 from allocation_algo import solve_model, run_auto_bid_aggressive
-from allocation_recommendation import calculate_optimal_bid
+from allocation_recommendation import simulate_optimal_bid
 
 # -----------------------------
 # Produits exemples
@@ -156,14 +156,13 @@ if simulate_submit and buyer_name:
     # -----------------------------
     user_qtys = {pid: prod["qty_desired"] for pid, prod in draft_products.items()}
     user_prices = {pid: prod["current_price"] for pid, prod in draft_products.items()}
-
-
-    recs = calculate_optimal_bid(
-    st.session_state.buyers,
-    products,
-    user_qtys=user_qtys,
-    user_prices=user_prices,
-    new_buyer_name=buyer_name,
+    
+    recs = simulate_optimal_bid(
+        st.session_state.buyers,
+        products,
+        user_qtys=user_qtys,
+        user_prices=user_prices,
+        new_buyer_name=buyer_name,  # optionnel, tu peux laisser le défaut "__SIMULATION__"
     )
 
 
