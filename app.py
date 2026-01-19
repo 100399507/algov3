@@ -46,11 +46,9 @@ st.sidebar.title("➕ Ajouter / Simuler un acheteur")
 
 with st.sidebar.form("add_buyer_form"):
     buyer_name = st.text_input("Nom acheteur")
-
     auto_bid = st.checkbox("Auto-bid activé", value=True)
 
     draft_products = {}
-
     for p in products:
         st.markdown(f"**{p['name']} ({p['id']})**")
 
@@ -58,16 +56,15 @@ with st.sidebar.form("add_buyer_form"):
         min_qty = max(p["seller_moq"], multiple)
 
         qty = st.number_input(
-        f"Qté désirée – {p['id']}",
-        min_value=min_qty,
-        value=min_qty,
-        step=multiple
+            f"Qté désirée – {p['id']}",
+            min_value=min_qty,
+            value=min_qty,
+            step=multiple
         )
 
-        # Déterminer le current_price minimal possible pour ce produit
-        current_price_min = p["starting_price"]  # valeur par défaut
+        # Déterminer le prix courant minimal pour ce produit
+        current_price_min = p["starting_price"]
         if st.session_state.buyers:
-            # On ne prend que les acheteurs ayant une allocation > 0 pour ce produit
             allocated_prices = [
                 b["products"][p["id"]]["current_price"]
                 for b in st.session_state.buyers
@@ -75,16 +72,13 @@ with st.sidebar.form("add_buyer_form"):
             ]
             if allocated_prices:
                 current_price_min = min(allocated_prices)
-        
-        # Champ input avec min_value=current_price_min
+
         price = st.number_input(
             f"Prix courant – {p['id']}",
             min_value=current_price_min,
             value=current_price_min,
-            step=0.5,
+            step=0.5
         )
-
-
 
         max_price = st.number_input(
             f"Prix max – {p['id']}",
@@ -103,6 +97,50 @@ with st.sidebar.form("add_buyer_form"):
 
     add_submit = st.form_submit_button("➕ Ajouter acheteur")
     simulate_submit = st.form_submit_button("🧪 Simuler allocation")
+
+# -----------------------------
+# Actions formulaire
+# -----------------------------
+if add_submit and buyer_name:
+    st.session_state.buyers.append({
+        "name": buyer_name,
+        "products": copy.deepcopy(draft_products),
+        "auto_bid": auto_bid
+    })
+    st.success(f"Acheteur {buyer_name} ajouté")
+
+if simulate_submit and buyer_name:
+    # 1️⃣ Créer une copie isolée des acheteurs existants
+    buyers_sim = copy.deepcopy(st.session_state.buyers)
+
+    # 2️⃣ Ajouter l'acheteur simulé
+    simulated_buyer = {
+        "name": "__SIMULATION__",
+        "products": copy.deepcopy(draft_products),
+        "auto_bid": True  # Auto-bid activé pour le simulateur seulement
+    }
+    buyers_sim.append(simulated_buyer)
+
+    # 3️⃣ Lancer l'auto-bid sur la copie uniquement
+    buyers_sim = run_auto_bid_aggressive(buyers_sim, products, max_rounds=5)
+
+    # 4️⃣ Récupérer l'allocation du simulateur
+    allocations, _ = solve_model(buyers_sim, products)
+    sim_alloc = allocations.get("__SIMULATION__", {})
+
+    # 5️⃣ Affichage clair
+    sim_rows = []
+    for pid, prod in draft_products.items():
+        sim_rows.append({
+            "Produit": pid,
+            "Prix courant simulé (€)": buyers_sim[-1]["products"][pid]["current_price"],
+            "Prix max simulé (€)": buyers_sim[-1]["products"][pid]["max_price"],
+            "Quantité simulée": sim_alloc.get(pid, 0)
+        })
+
+    st.subheader(f"🧪 Simulation pour {buyer_name}")
+    st.dataframe(pd.DataFrame(sim_rows), use_container_width=True)
+
 
 
 # -----------------------------
