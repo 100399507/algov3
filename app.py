@@ -154,7 +154,13 @@ if simulate_submit and buyer_name:
     # -----------------------------
     # Recommandation automatique pour sécuriser 100%
     # -----------------------------
-    recs = calculate_optimal_bid(st.session_state.buyers, products, new_buyer_name=buyer_name)
+    recs = calculate_optimal_bid(
+    st.session_state.buyers,
+    products,
+    new_buyer_name=buyer_name,
+    starting_prices=draft_products  # <-- ici
+    )
+
     rec_rows = []
     for pid, rec in recs.items():
         rec_rows.append({
