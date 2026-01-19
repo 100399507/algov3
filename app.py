@@ -89,7 +89,7 @@ with st.sidebar.form("add_buyer_form"):
     
         # Affichage prix courant pour info mais non modifiable
 
-        st.metric(f"Prix courant minimum – {p['id']}", f"{current_price_min:.2f} €")
+        price = st.metric(f"Prix courant minimum – {p['id']}", f"{current_price_min:.2f} €")
 
   
         # Prix max
