@@ -20,6 +20,7 @@ def calculate_optimal_bid(buyers, products, user_qtys, user_prices, new_buyer_na
         stock_available = product["stock"]
 
         qty_desired = user_qtys.get(prod_id, 0)
+        price_desired = user_prices.get(prod_id,0)
 
         # Allocation actuelle
         allocations, _ = solve_model(buyers_copy, products)
@@ -29,7 +30,7 @@ def calculate_optimal_bid(buyers, products, user_qtys, user_prices, new_buyer_na
         # Si la quantité saisie est ≤ stock restant, on ne fait pas d'incrémentation
         if qty_desired <= remaining_stock:
             recommendations[prod_id] = {
-                "recommended_price": user_prices,  # on renvoie le current price
+                "recommended_price": price_desired,  # on renvoie le current price
                 "recommended_qty": qty_desired,
                 "remaining_stock": remaining_stock
             }
