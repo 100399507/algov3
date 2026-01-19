@@ -29,7 +29,7 @@ def calculate_optimal_bid(buyers, products, user_qtys, new_buyer_name="Nouvel Ac
         # Si la quantité saisie est ≤ stock restant, on ne fait pas d'incrémentation
         if qty_desired <= remaining_stock:
             recommendations[prod_id] = {
-                "recommended_price": None,  # pas besoin d'augmenter le prix
+                "recommended_price": draft_products[prod_id]["current_price"],  # on renvoie le current price
                 "recommended_qty": qty_desired,
                 "remaining_stock": remaining_stock
             }
