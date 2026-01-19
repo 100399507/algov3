@@ -89,7 +89,7 @@ with st.sidebar.form("add_buyer_form"):
     
         # Affichage prix courant pour info mais non modifiable
         price = st.number_input(
-            f"Prix courant – {p['id']}",
+            f"Prix minimum d'enchère – {p['id']}",
             min_value=current_price_min,
             value=current_price_min,
             step=0.5,
