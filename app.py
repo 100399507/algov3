@@ -65,6 +65,7 @@ with st.sidebar.form("add_buyer_form"):
             key=f"qty_{p['id']}_{idx_p}"
         )
         
+        #Prix courant min
         prices = [
             b["products"][p["id"]]["current_price"]
             for b in st.session_state.buyers
@@ -77,21 +78,6 @@ with st.sidebar.form("add_buyer_form"):
             f"Prix courant – {p['id']}",
             f"{current_price:.2f} €"
         )
-
-    
-        # Affichage prix courant pour info mais non modifiable
-
-        price = st.metric(f"Prix courant minimum – {p['id']}", f"{current_price_min:.2f} €")
-
-        price = st.number_input(
-        f"Prix minimum d'enchère – {p['id']}",
-        min_value=current_price_min,
-        value=current_price_min,
-        step=0.5,
-        key=f"price_{p['id']}_{idx_p}",
-        disabled=True  # 🔹 affiché mais pas modifiable
-        )
-
   
         # Prix max
         max_price = st.number_input(
