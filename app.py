@@ -82,8 +82,8 @@ with st.sidebar.form("add_buyer_form"):
         # Prix max
         max_price = st.number_input(
             f"Prix max – {p['id']}",
-            min_value=price,
-            value=price,
+            min_value=current_price,
+            value=current_price,
             step=0.5,
             key=f"max_{p['id']}_{idx_p}"
         )
