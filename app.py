@@ -90,7 +90,7 @@ with st.sidebar.form("add_buyer_form"):
 
         draft_products[p["id"]] = {
             "qty_desired": qty,
-            "current_price": price,
+            "current_price": current_price,
             "max_price": max_price,
             "moq": p["seller_moq"]
         }
