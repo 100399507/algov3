@@ -268,6 +268,7 @@ if st.button("▶️ Lancer simulation avec auto-bid"):
         buyers_copy = buyers_copy_new
 
     st.session_state.history = history
+    st.session_state.buyers = buyers_copy
 
 # -----------------------------
 # Affichage itérations
