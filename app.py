@@ -2,33 +2,45 @@ import streamlit as st
 import pandas as pd
 import pulp
 
-# Simulation de stock
-data = {'ref': ['A', 'B', 'C'], 'stock': [100, 50, 200], 'prix_vente': [10, 20, 5]}
-df_stock = pd.DataFrame(data)
+# Charger les données
+df_stock = pd.read_csv('data_complet.csv')
 
-st.title("Traidestock - Smart Matching MVP")
+# Simulation d'acheteurs (pour le test)
+acheteurs = {
+    "Acheteur Pro (Score: 90)": 90,
+    "Acheteur Standard (Score: 60)": 60,
+    "Nouveau Client (Score: 30)": 30
+}
 
-# Input acheteur
-st.subheader("Votre Panier d'Achat")
-refs = st.multiselect("Choisir les références", df_stock['ref'].tolist())
-quantites = {ref: st.number_input(f"Quantité pour {ref}", min_value=0) for ref in refs}
+st.title("Traidestock - Moteur d'Allocation Multi-Acheteurs")
 
-if st.button("Lancer l'Optimisation"):
-    # Initialisation du problème de maximisation
-    prob = pulp.LpProblem("Allocation", pulp.LpMaximize)
+# Interface
+acheteur_choisi = st.selectbox("Qui demande le stock ?", list(acheteurs.keys()))
+score_acheteur = acheteurs[acheteur_choisi]
+
+st.subheader("Besoins du client")
+demandes = {}
+for i, row in df_stock.iterrows():
+    demandes[row['ref']] = st.number_input(f"Qté pour {row['ref']} (Stock: {row['stock']})", min_value=0, max_value=int(row['stock']))
+
+if st.button("Simuler l'Allocation"):
+    # Logique : On priorise selon le score
+    # Si le score > 80, on valide 100% de la demande
+    # Si le score < 50, on applique une réduction de 20% par sécurité
     
-    # Variables de décision
-    vars = {ref: pulp.LpVariable(f"x_{ref}", 0, quantites[ref]) for ref in refs}
+    st.write(f"### Résultat pour {acheteur_choisi}")
     
-    # Objectif : Maximiser la valeur (Prix * Quantité)
-    prob += pulp.lpSum([vars[ref] * df_stock.loc[df_stock['ref']==ref, 'prix_vente'].values[0] for ref in refs])
+    taux_allocation = 1.0 if score_acheteur >= 80 else 0.8
     
-    # Contrainte : Ne pas dépasser le stock
-    for ref in refs:
-        prob += vars[ref] <= df_stock.loc[df_stock['ref']==ref, 'stock'].values[0]
-        
-    prob.solve()
+    results = []
+    for ref, qte in demandes.items():
+        alloue = int(qte * taux_allocation)
+        results.append({'Ref': ref, 'Demandé': qte, 'Alloué': alloue})
     
-    st.write("### Proposition d'allocation")
-    for ref in refs:
-        st.write(f"Référence {ref} : {vars[ref].varValue} unités allouées")
+    df_res = pd.DataFrame(results)
+    st.table(df_res)
+    
+    if score_acheteur < 80:
+        st.warning("Client à score moyen : Allocation limitée à 80% pour préserver les stocks prioritaires.")
+    else:
+        st.success("Client Premium : Allocation prioritaire validée !")
