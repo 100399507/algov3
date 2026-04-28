@@ -12,7 +12,7 @@ df_stock, df_offres = load_data()
 
 st.title("Traidestock - Analyse & Allocation")
 
-# --- 1. Synthèse de départ (Offres et Écoulement) ---
+# --- 1. État des lieux ---
 st.header("État des lieux")
 
 # Synthèse par référence
@@ -29,11 +29,15 @@ stock_view['Taux écoulement'] = (stock_view['Qté Demandée'] / stock_view['sto
 st.write("### Synthèse des offres par référence")
 st.table(stock_view)
 
-# --- 2. Détail de l'inventaire initial ---
+# --- 2. Liste détaillée des offres ---
+st.write("### Liste détaillée des offres reçues")
+st.dataframe(df_offres, use_container_width=True)
+
+# --- 3. Inventaire initial ---
 st.write("### Inventaire de départ")
 st.dataframe(df_stock, use_container_width=True)
 
-# --- 3. Logique d'allocation ---
+# --- 4. Logique d'allocation ---
 def calculer_allocation(df_offres, stocks_restants, critere_tri, ordre_tri):
     allocation_temp = df_offres.sort_values(by=['ref'] + critere_tri, ascending=[True] + ordre_tri)
     resultats = []
@@ -68,7 +72,7 @@ for nom, (critere, ordre) in scenarios.items():
     revenu = (df_res['Prix'] * df_res['Alloué']).sum()
     comparaison[nom] = {'Revenu': revenu, 'Data': df_res}
 
-# --- 4. Comparatif Stratégies ---
+# --- 5. Comparatif Stratégies ---
 st.header("Simulation d'Allocation")
 choix = st.selectbox("Sélectionnez une stratégie :", list(scenarios.keys()))
 st.metric("Revenu total estimé", f"{comparaison[choix]['Revenu']:,.2f} €")
