@@ -10,9 +10,26 @@ def load_data():
 
 df_stock, df_offres = load_data()
 
-st.title("Traidestock - Allocation Automatique")
+st.title("Traidestock - Analyse & Allocation")
 
-# Fonction pour calculer l'allocation selon une stratégie donnée
+# --- 1. Synthèse de départ (Offres et Écoulement) ---
+st.header("État des lieux")
+
+# Synthèse par référence
+synthese_ref = df_offres.groupby('ref').agg({
+    'acheteur': 'count',
+    'qte': 'sum',
+    'prix': 'mean'
+}).rename(columns={'acheteur': 'Nb Offres', 'qte': 'Qté Demandée', 'prix': 'Prix Moyen'})
+
+# Comparatif Stock vs Demande
+stock_view = df_stock.merge(synthese_ref, on='ref', how='left').fillna(0)
+stock_view['Taux écoulement'] = (stock_view['Qté Demandée'] / stock_view['stock']).apply(lambda x: f"{x:.1%}")
+
+st.write("### Synthèse par référence et écoulement")
+st.table(stock_view)
+
+# --- 2. Logique d'allocation (identique au précédent) ---
 def calculer_allocation(df_offres, stocks_restants, critere_tri, ordre_tri):
     allocation_temp = df_offres.sort_values(by=['ref'] + critere_tri, ascending=[True] + ordre_tri)
     resultats = []
@@ -32,14 +49,12 @@ def calculer_allocation(df_offres, stocks_restants, critere_tri, ordre_tri):
                 stock_dispo -= a_allouer
     return pd.DataFrame(resultats)
 
-# Préparation des stocks
+# Préparation pour les scénarios
 stocks_dict = df_stock.set_index('ref')['stock'].to_dict()
-
-# Définition des 3 scénarios
 scenarios = {
-    "Profit Maximum": (['prix'], [False]),        # Tri par prix décroissant
-    "Volume Maximum": (['qte'], [False]),        # Tri par quantité décroissante
-    "Priorité Acheteur": (['acheteur'], [True])  # Tri alphabétique acheteur
+    "Profit Maximum": (['prix'], [False]),
+    "Volume Maximum": (['qte'], [False]),
+    "Priorité Acheteur": (['acheteur'], [True])
 }
 
 # Calculs
@@ -49,18 +64,11 @@ for nom, (critere, ordre) in scenarios.items():
     revenu = (df_res['Prix'] * df_res['Alloué']).sum()
     comparaison[nom] = {'Revenu': revenu, 'Data': df_res}
 
-# Interface de choix
-st.subheader("Comparaison des Stratégies")
-choix = st.radio("Sélectionnez la stratégie à appliquer :", list(scenarios.keys()))
-
-# Affichage des résultats
-df_final = comparaison[choix]['Data']
+# --- 3. Comparatif Stratégies ---
+st.header("Simulation d'Allocation")
+choix = st.selectbox("Sélectionnez une stratégie :", list(scenarios.keys()))
 st.metric("Revenu total estimé", f"{comparaison[choix]['Revenu']:,.2f} €")
+st.table(comparaison[choix]['Data'])
 
-st.write(f"### Détail de l'allocation ({choix})")
-st.table(df_final)
-
-# Validation
-if st.button("Valider et Exécuter l'allocation"):
-    st.success(f"Allocation validée selon la stratégie : {choix}")
-    # Ici, ajouter la logique pour sauvegarder/exporter le fichier final
+if st.button("Valider et Exécuter"):
+    st.success(f"Allocation validée avec la stratégie : {choix}")
