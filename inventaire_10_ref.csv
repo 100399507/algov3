@@ -1,11 +1,11 @@
-ref,stock,prix_plancher,categorie
-REF001,120,52.34,Electronique
-REF002,200,12.87,Accessoires
-REF003,674,89.12,Composant
-REF004,321,44.56,Electronique
-REF005,980,15.23,Consommable
-REF006,56,92.45,Haut de gamme
-REF007,412,33.89,Outillage
-REF008,765,8.76,Consommable
-REF009,234,67.34,Electronique
-REF010,543,21.98,Accessoires
+ref,stock,prix_plancher,categorie,prix_immediat
+REF001,120,52.34,Electronique,62.81
+REF002,200,12.87,Accessoires,15.44
+REF003,674,89.12,Composant,106.94
+REF004,321,44.56,Electronique,53.47
+REF005,980,15.23,Consommable,18.28
+REF006,56,92.45,Haut de gamme,110.94
+REF007,412,33.89,Outillage,40.67
+REF008,765,8.76,Consommable,10.51
+REF009,234,67.34,Electronique,80.81
+REF010,543,21.98,Accessoires,26.38
