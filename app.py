@@ -1,46 +1,36 @@
 import streamlit as st
 import pandas as pd
-import pulp
 
-# Charger les données
-df_stock = pd.read_csv('data_complet.csv')
+# Chargement des données
+df_stock = pd.read_csv('inventaire_10_ref.csv')
+df_offres = pd.read_csv('offres_en_attente.csv')
 
-# Simulation d'acheteurs (pour le test)
-acheteurs = {
-    "Acheteur Pro (Score: 90)": 90,
-    "Acheteur Standard (Score: 60)": 60,
-    "Nouveau Client (Score: 30)": 30
-}
+st.title("Traidestock - Smart Matching MVP")
 
-st.title("Traidestock - Moteur d'Allocation Multi-Acheteurs")
+# Saisie de la nouvelle offre
+st.sidebar.header("Nouvelle Offre Acheteur")
+acheteur = st.sidebar.selectbox("Acheteur", ["Acheteur_A", "Acheteur_B", "Acheteur_C"])
+ref = st.sidebar.selectbox("Référence", df_stock['ref'].unique())
+prix = st.sidebar.number_input("Prix unitaire proposé")
+qte = st.sidebar.number_input("Quantité demandée")
 
-# Interface
-acheteur_choisi = st.selectbox("Qui demande le stock ?", list(acheteurs.keys()))
-score_acheteur = acheteurs[acheteur_choisi]
-
-st.subheader("Besoins du client")
-demandes = {}
-for i, row in df_stock.iterrows():
-    demandes[row['ref']] = st.number_input(f"Qté pour {row['ref']} (Stock: {row['stock']})", min_value=0, max_value=int(row['stock']))
-
-if st.button("Simuler l'Allocation"):
-    # Logique : On priorise selon le score
-    # Si le score > 80, on valide 100% de la demande
-    # Si le score < 50, on applique une réduction de 20% par sécurité
+if st.sidebar.button("Analyser et Allouer"):
+    # Calcul du prix moyen du marché (offres des autres acheteurs)
+    marche = df_offres[df_offres['ref'] == ref]
+    prix_moyen = marche['prix'].mean() if not marche.empty else df_stock.loc[df_stock['ref']==ref, 'prix_plancher'].values[0]
     
-    st.write(f"### Résultat pour {acheteur_choisi}")
-    
-    taux_allocation = 1.0 if score_acheteur >= 80 else 0.8
-    
-    results = []
-    for ref, qte in demandes.items():
-        alloue = int(qte * taux_allocation)
-        results.append({'Ref': ref, 'Demandé': qte, 'Alloué': alloue})
-    
-    df_res = pd.DataFrame(results)
-    st.table(df_res)
-    
-    if score_acheteur < 80:
-        st.warning("Client à score moyen : Allocation limitée à 80% pour préserver les stocks prioritaires.")
+    st.write(f"### Analyse pour {ref}")
+    st.metric("Prix moyen du marché", f"{prix_moyen:.2f} €")
+    st.metric("Votre offre", f"{prix:.2f} €")
+
+    # Logique de recommandation NO-TOUCH
+    if prix >= prix_moyen:
+        st.success("✅ RECOMMANDATION : Validation automatique (No-Touch).")
+    elif prix >= prix_moyen * 0.95:
+        st.info("ℹ️ RECOMMANDATION : Négoce léger possible (Alignement 98%).")
     else:
-        st.success("Client Premium : Allocation prioritaire validée !")
+        st.warning("⚠️ RECOMMANDATION : Contre-proposition nécessaire (Prix trop bas).")
+
+# Dashboard de répartition
+st.write("### État du carnet d'ordres par référence")
+st.table(df_offres.groupby('ref').agg({'prix': 'mean', 'qte': 'sum'}))
