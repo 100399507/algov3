@@ -1,0 +1,9 @@
+ref,stock,prix_unitaire,categorie
+REF001,500,12.50,Electronique
+REF002,1200,8.90,Accessoires
+REF003,85,45.00,Composant
+REF004,300,15.20,Electronique
+REF005,1500,5.50,Consommable
+REF006,45,88.00,Haut de gamme
+REF007,200,22.00,Outillage
+REF008,1000,7.20,Consommable
