@@ -1,7 +1,7 @@
-ref,acheteur,prix,qte
-REF001,Acheteur_A,51.0,100
-REF001,Acheteur_B,53.0,50
-REF002,Acheteur_C,12.5,200
-REF004,Acheteur_A,44.0,150
-REF005,Acheteur_B,15.0,300
-REF008,Acheteur_C,8.5,500
+ref,acheteur,prix,qte,heure_offre
+REF001,Acheteur_A,65.00,50,2026-04-28 09:00:00
+REF001,Acheteur_B,63.00,100,2026-04-28 10:30:00
+REF002,Acheteur_C,16.00,150,2026-04-28 08:15:00
+REF003,Acheteur_A,108.00,200,2026-04-28 11:00:00
+REF004,Acheteur_D,55.00,300,2026-04-28 09:45:00
+REF005,Acheteur_B,19.00,500,2026-04-28 12:20:00
