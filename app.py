@@ -1,36 +1,45 @@
 import streamlit as st
 import pandas as pd
 
-# Chargement des données
+# Chargement
 df_stock = pd.read_csv('inventaire_10_ref.csv')
 df_offres = pd.read_csv('offres_en_attente.csv')
 
-st.title("Traidestock - Smart Matching MVP")
+st.title("Traidestock - Allocation Automatique")
 
-# Saisie de la nouvelle offre
-st.sidebar.header("Nouvelle Offre Acheteur")
-acheteur = st.sidebar.selectbox("Acheteur", ["Acheteur_A", "Acheteur_B", "Acheteur_C"])
-ref = st.sidebar.selectbox("Référence", df_stock['ref'].unique())
-prix = st.sidebar.number_input("Prix unitaire proposé")
-qte = st.sidebar.number_input("Quantité demandée")
+# 1. Calcul du score de profitabilité par offre (Prix * Quantité)
+df_offres['score_profit'] = df_offres['prix'] * df_offres['qte']
 
-if st.sidebar.button("Analyser et Allouer"):
-    # Calcul du prix moyen du marché (offres des autres acheteurs)
-    marche = df_offres[df_offres['ref'] == ref]
-    prix_moyen = marche['prix'].mean() if not marche.empty else df_stock.loc[df_stock['ref']==ref, 'prix_plancher'].values[0]
-    
-    st.write(f"### Analyse pour {ref}")
-    st.metric("Prix moyen du marché", f"{prix_moyen:.2f} €")
-    st.metric("Votre offre", f"{prix:.2f} €")
+# 2. Logique d'allocation (Tri par prix décroissant par référence)
+# On donne la priorité aux acheteurs qui paient le plus cher
+allocation = df_offres.sort_values(['ref', 'prix'], ascending=[True, False])
 
-    # Logique de recommandation NO-TOUCH
-    if prix >= prix_moyen:
-        st.success("✅ RECOMMANDATION : Validation automatique (No-Touch).")
-    elif prix >= prix_moyen * 0.95:
-        st.info("ℹ️ RECOMMANDATION : Négoce léger possible (Alignement 98%).")
-    else:
-        st.warning("⚠️ RECOMMANDATION : Contre-proposition nécessaire (Prix trop bas).")
+st.write("### Recommandation d'Allocation par Acheteur")
 
-# Dashboard de répartition
-st.write("### État du carnet d'ordres par référence")
-st.table(df_offres.groupby('ref').agg({'prix': 'mean', 'qte': 'sum'}))
+# On alloue le stock aux meilleurs offreurs
+resultats = []
+stocks_restants = df_stock.set_index('ref')['stock'].to_dict()
+
+for ref, group in allocation.groupby('ref'):
+    stock_dispo = stocks_restants.get(ref, 0)
+    for index, row in group.iterrows():
+        a_allouer = min(row['qte'], stock_dispo)
+        if a_allouer > 0:
+            resultats.append({
+                'Référence': ref,
+                'Acheteur': row['acheteur'],
+                'Prix': row['prix'],
+                'Alloué': a_allouer
+            })
+            stock_dispo -= a_allouer
+
+df_allocation = pd.DataFrame(resultats)
+st.table(df_allocation)
+
+# 3. Stats pour le vendeur (No-Touch Dashboard)
+st.write("### Analyse du gain (Revenu Total)")
+total_revenue = (df_allocation['Prix'] * df_allocation['Alloué']).sum()
+st.metric("Revenu total optimisé", f"{total_revenue:,.2f} €")
+
+if st.button("Valider et Exécuter l'allocation"):
+    st.success("Allocation envoyée aux acheteurs (Mode No-Touch activé).")
