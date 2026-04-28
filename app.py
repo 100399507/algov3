@@ -1,45 +1,66 @@
 import streamlit as st
 import pandas as pd
 
-# Chargement
-df_stock = pd.read_csv('inventaire_10_ref.csv')
-df_offres = pd.read_csv('offres_en_attente.csv')
+# Chargement des données
+@st.cache_data
+def load_data():
+    df_stock = pd.read_csv('inventaire_10_ref.csv')
+    df_offres = pd.read_csv('offres_en_attente.csv')
+    return df_stock, df_offres
+
+df_stock, df_offres = load_data()
 
 st.title("Traidestock - Allocation Automatique")
 
-# 1. Calcul du score de profitabilité par offre (Prix * Quantité)
-df_offres['score_profit'] = df_offres['prix'] * df_offres['qte']
+# Fonction pour calculer l'allocation selon une stratégie donnée
+def calculer_allocation(df_offres, stocks_restants, critere_tri, ordre_tri):
+    allocation_temp = df_offres.sort_values(by=['ref'] + critere_tri, ascending=[True] + ordre_tri)
+    resultats = []
+    stocks_temp = stocks_restants.copy()
+    
+    for ref, group in allocation_temp.groupby('ref'):
+        stock_dispo = stocks_temp.get(ref, 0)
+        for _, row in group.iterrows():
+            a_allouer = min(row['qte'], stock_dispo)
+            if a_allouer > 0:
+                resultats.append({
+                    'Référence': ref,
+                    'Acheteur': row['acheteur'],
+                    'Prix': row['prix'],
+                    'Alloué': a_allouer
+                })
+                stock_dispo -= a_allouer
+    return pd.DataFrame(resultats)
 
-# 2. Logique d'allocation (Tri par prix décroissant par référence)
-# On donne la priorité aux acheteurs qui paient le plus cher
-allocation = df_offres.sort_values(['ref', 'prix'], ascending=[True, False])
+# Préparation des stocks
+stocks_dict = df_stock.set_index('ref')['stock'].to_dict()
 
-st.write("### Recommandation d'Allocation par Acheteur")
+# Définition des 3 scénarios
+scenarios = {
+    "Profit Maximum": (['prix'], [False]),        # Tri par prix décroissant
+    "Volume Maximum": (['qte'], [False]),        # Tri par quantité décroissante
+    "Priorité Acheteur": (['acheteur'], [True])  # Tri alphabétique acheteur
+}
 
-# On alloue le stock aux meilleurs offreurs
-resultats = []
-stocks_restants = df_stock.set_index('ref')['stock'].to_dict()
+# Calculs
+comparaison = {}
+for nom, (critere, ordre) in scenarios.items():
+    df_res = calculer_allocation(df_offres, stocks_dict, critere, ordre)
+    revenu = (df_res['Prix'] * df_res['Alloué']).sum()
+    comparaison[nom] = {'Revenu': revenu, 'Data': df_res}
 
-for ref, group in allocation.groupby('ref'):
-    stock_dispo = stocks_restants.get(ref, 0)
-    for index, row in group.iterrows():
-        a_allouer = min(row['qte'], stock_dispo)
-        if a_allouer > 0:
-            resultats.append({
-                'Référence': ref,
-                'Acheteur': row['acheteur'],
-                'Prix': row['prix'],
-                'Alloué': a_allouer
-            })
-            stock_dispo -= a_allouer
+# Interface de choix
+st.subheader("Comparaison des Stratégies")
+choix = st.radio("Sélectionnez la stratégie à appliquer :", list(scenarios.keys()))
 
-df_allocation = pd.DataFrame(resultats)
-st.table(df_allocation)
+# Affichage des résultats
+df_final = comparaison[choix]['Data']
+st.metric("Revenu total estimé", f"{comparaison[choix]['Revenu']:,.2f} €")
 
-# 3. Stats pour le vendeur (No-Touch Dashboard)
-st.write("### Analyse du gain (Revenu Total)")
-total_revenue = (df_allocation['Prix'] * df_allocation['Alloué']).sum()
-st.metric("Revenu total optimisé", f"{total_revenue:,.2f} €")
+st.write(f"### Détail de l'allocation ({choix})")
+st.table(df_final)
 
+# Validation
 if st.button("Valider et Exécuter l'allocation"):
-    st.success("Allocation envoyée aux acheteurs (Mode No-Touch activé).")
+    st.success(f"Allocation validée selon la stratégie : {choix}")
+    # Ici, ajouter la logique pour sauvegarder/exporter le fichier final
